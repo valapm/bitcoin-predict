@@ -1,0 +1,27 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.eslint.json"
+  },
+  "plugins": ["@typescript-eslint", "functional"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking",
+    // "plugin:functional/external-recommended",
+    // "plugin:functional/lite",
+    "prettier",
+    "prettier/@typescript-eslint"
+  ],
+  "rules": {
+    "functional/prefer-readonly-type": "off"
+    // {
+    //   "allowLocalMutation": false,
+    //   "allowMutableReturnType": true,
+    //   "checkImplicit": false,
+    //   "ignoreClass": false,
+    //   "ignoreInterface": false
+    // }
+  }
+}
