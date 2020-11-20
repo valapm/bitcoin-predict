@@ -1,11 +1,16 @@
-import { buildContractClass, compile, Bytes, bsv } from "scryptlib"
-// import CompileResult = require("scryptlib/compilerWrapper")
-// import bsv from "bsv"
-import { marketDetails } from "./transaction"
-
+import { compile, bsv } from "scryptlib"
+import { getMerkleRoot } from "./merkleTree"
 import { num2bin } from "./hex"
-import { sha256 } from "./sha"
-// import { compileContract } from "scrypt_boilerplate/helper"
+import { minerDetail, getMinerPubString } from "./oracle"
+
+export type marketDetails = {
+  resolve: string
+}
+
+export type marketStatus = {
+  decided: boolean
+  decision: number
+}
 
 type contract = {
   asm: string
@@ -16,84 +21,62 @@ export function getCompiledPM(): void {
   compile({ path: contractPath }, { desc: true })
 }
 
-export function getASM(minerKeys: string): string {
+export function getLockingScriptASMTemplate(): string[] {
   const compiled = require("../predictionMarket.json") as contract
-  const asmTemplate = compiled.asm.split(" ")
-  asmTemplate[7] = minerKeys
-  return asmTemplate.join(" ")
-  // return asmTemplate.map((code): string => (code[0] === "$" ? contractVars[code.slice(1)] : code)).join(" ")
+  return compiled.asm.split(" ")
 }
 
-// export function getInitScript(minerKeys: string, marketDetails: marketDetails, marketStatus: string): bsv.Script {
-//   // const compiled = require("../predictionMarket.json")
-//   // const PM = buildContractClass(compiled)
-//   // const pm = new PM(minerKeys)
-
-//   // pm.setDataPart(marketStatus)
-
-//   const asm = getASM({ $minerKeys: minerKeys })
-
-//   const fullScript = `${asm} OP_RETURN ${JSON.stringify(marketDetails)} ${marketStatus}`
-
-//   return bsv.Script.fromASM(fullScript)
-// }
-
-export function getInitMarketStatus(pubKey: string, liquidity: number): string {
-  const status = liquidity.toString() + "00" + "00"
-  const entry = pubKey + status
-  const balanceTableRoot = sha256(sha256(entry).repeat(2))
-  return status + balanceTableRoot
+export function getLockingScriptASM(minerDetails: minerDetail[]): string[] {
+  const asmTemplate = getLockingScriptASMTemplate()
+  asmTemplate[7] = getMinerPubString(minerDetails)
+  return asmTemplate
 }
 
-// export function getAddEntryMarketStatus(
-//   prevMarketStatus: string,
-//   pubKeyHex: string,
-//   liquidity: number,
-//   sharesFor: number,
-//   sharesAgainst: number
-// ): string {
-//   const newEntry = pubKeyHex + num2bin(liquidity, 1) + num2bin(sharesFor, 1) + num2bin(sharesAgainst, 1)
-//   const newLeaf = sha256(newEntry)
-// }
+export type balance = {
+  liquidity: number
+  sharesFor: number
+  sharesAgainst: number
+}
 
-// export function getAddEntryScript(
-//   prevScript: string,
-//   balances: string[],
-//   liquidity: number,
-//   sharesFor: number,
-//   sharesAgainst: number,
-//   publicKey: string
-// ): string {}
+export type entry = {
+  balance: balance
+  publicKey: bsv.PublicKey
+}
 
-// export function getUpdateEntryScript(
-//   prevScript: string,
-//   balances: string[],
-//   liquidity: number,
-//   sharesFor: number,
-//   sharesAgainst: number,
-//   publicKey: string,
-//   signature: string
-// ): string {}
+export function getEntryHex(entry: entry): string {
+  return (
+    entry.publicKey.toString() +
+    num2bin(entry.balance.liquidity, 1) +
+    num2bin(entry.balance.sharesFor, 1) +
+    num2bin(entry.balance.sharesAgainst, 1)
+  )
+}
 
-// export function getRedeemScript(prevScript: string, balances: string[], publicKey: string, signature: string): string {}
+export function getBalanceHex(balance: balance): string {
+  return num2bin(balance.liquidity, 1) + num2bin(balance.sharesFor, 1) + num2bin(balance.sharesAgainst, 1)
+}
 
-// export function getDecideScript(prevScript: string, result: number, minerSigs: string): string {}
+export function getMarketBalance(entries: entry[]): balance {
+  return entries.reduce(
+    (balance, entry) => {
+      return {
+        liquidity: balance.liquidity + entry.balance.liquidity,
+        sharesFor: balance.sharesFor + entry.balance.sharesFor,
+        sharesAgainst: balance.sharesAgainst + entry.balance.sharesAgainst
+      }
+    },
+    { liquidity: 0, sharesFor: 0, sharesAgainst: 0 }
+  )
+}
 
-//   const asm = compiled.asm.toString().split(" ")
-//   const script = asm.map((x: string) => (x.startsWith("OP") ? bsv.OpCode[x] : x))
+export function getMarketBalanceHex(entries: entry[]): string {
+  const marketBalance = getBalanceHex(getMarketBalance(entries))
+  const balanceTableRoot = getMerkleRoot(entries.map(getEntryHex))
+  return marketBalance + balanceTableRoot
+}
 
-//   const minerKeysIndex = asm.findIndex((x: string) => x === "$minerKeys")
-//   script[minerKeysIndex] = (minerKeys: string) => minerKeysIndex
-
-//   console.log(script.slice(0, 20))
-
-//   //@ts-ignore
-//   // const Token = buildContractClass(compiled)
-
-//   function setup() {}
-
-//   return {
-//     script,
-//     size: 26000
-//   }
-// }
+export function getMarketDecisionHex(status: marketStatus): string {
+  const isDecidedHex = status.decided ? "01" : "00"
+  const resultHex = num2bin(status.decision, 1)
+  return isDecidedHex + resultHex
+}

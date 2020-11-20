@@ -61,3 +61,9 @@ test("build pm init transaction", () => {
 // test("create addEntry unlocking script", () => {
 //   getAddEntryUnlockingScript()
 // })
+
+// function getMinerSigs(minerPrivKeys: rabinPrivKey[], vote: number): rabinSig[] {
+//   return minerPrivKeys.map(privKey => {
+//     return getSignature(vote, privKey)
+//   })
+// }

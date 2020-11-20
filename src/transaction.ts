@@ -1,6 +1,14 @@
 import { bsv, SigHashPreimage, PubKey, Bytes, toHex } from "scryptlib"
-import { getASM, getInitMarketStatus } from "./pm"
-import { getMinerPubString, minerDetail } from "./rabin"
+import {
+  getLockingScriptASM,
+  getMarketDecisionHex,
+  getMarketBalanceHex,
+  balance,
+  marketDetails,
+  entry,
+  marketStatus
+} from "./pm"
+import { minerDetail } from "./oracle"
 import { getLmsrSats } from "./lmsr"
 import { getMerkleRoot } from "./merkleTree"
 
@@ -10,32 +18,35 @@ const identifier = "25c78e732e3af9aa593d1f71912775bcb2ada1bf" // TODO:
 const Signature = bsv.crypto.Signature
 const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
 
-export type marketDetails = {
-  resolve: string
-}
-
-// export async function fetchMinerDetails(): Promise<minerDetail[]> {
-//   // TODO: Implement
-// }
-
-function getTotalVotes(minerDetails: minerDetail[]): number {
-  return minerDetails.reduce((votes: number, miner: minerDetail) => votes + miner.votes, 0)
-}
-
-export function isValidMinerDetails(minerDetails: minerDetail[]): boolean {
-  return getTotalVotes(minerDetails) === 100
-}
-
-export function getInitLockingScript(
-  minerKeys: string,
+export function getLockingScript(
+  minerDetails: minerDetail[],
   marketDetails: marketDetails,
-  marketStatus: string
+  marketStatus: marketStatus,
+  entries: entry[]
 ): bsv.Script {
-  const asm = getASM(minerKeys)
+  const asm = getLockingScriptASM(minerDetails).join(" ")
+  const marketBalanceHex = getMarketBalanceHex(entries)
+  const decisionHex = getMarketDecisionHex(marketStatus)
 
-  const fullScript = `${asm} OP_RETURN ${identifier} ${JSON.stringify(marketDetails)} ${marketStatus}`
+  const fullScript = `${asm} OP_RETURN ${identifier} ${JSON.stringify(marketDetails)} ${decisionHex + marketBalanceHex}`
 
   return bsv.Script.fromASM(fullScript)
+}
+
+export function getMinerDetails(tx: bsv.Transaction): minerDetail[] {
+  // TODO:
+}
+
+export function getMarketDetails(tx: bsv.Transaction): marketDetails {
+  // TODO:
+}
+
+export function getMarketStatus(tx: bsv.Transaction): marketStatus {
+  // TODO:
+}
+
+export function getEntries(tx: bsv.Transaction): entry[] {
+  // TODO:
 }
 
 export function getUpdateLockingScript(prevOut: bsv.Transaction.Output, marketStatus: string): bsv.Script {
@@ -47,17 +58,23 @@ export function getUpdateLockingScript(prevOut: bsv.Transaction.Output, marketSt
   return bsv.Script.fromASM(newASM)
 }
 
+const balances = [
+  {
+    publicKey,
+    sharesFor,
+    sharesAgainst,
+    liquidity
+  }
+]
+
 export function buildInitTx(
   marketDetails: marketDetails,
-  liquidity: number,
-  publicKey: bsv.PublicKey,
-  minerDetails: minerDetail[]
-  // utxos: bsv.Transaction.UnspentOutput[]
+  minerDetails: minerDetail[],
+  balances: balance[]
 ): bsv.Transaction {
   const tx = new bsv.Transaction()
 
-  const pubKey = publicKey.toString()
-  const marketStatus = getInitMarketStatus(pubKey, liquidity)
+  const marketStatus = getMarketStatusHex(balances)
   const minerVoteString = getMinerPubString(minerDetails)
 
   const script = getInitLockingScript(minerVoteString, marketDetails, marketStatus)

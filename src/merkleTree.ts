@@ -10,7 +10,7 @@ export function getMerkleRoot(hashes: string[]): string {
 }
 
 export function merkelizeArray(array: string[]): string[] {
-  let reduced = []
+  const reduced = []
   for (let i = 0; i <= array.length - 2; i++) {
     if (i % 2 === 0) {
       const hashString = array.slice(i, i + 2).join("")

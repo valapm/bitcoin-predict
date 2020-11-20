@@ -31,3 +31,7 @@ export async function getSatBalance(address: string, apiKey: string): Promise<nu
   const sats = utxos.reduce((amount: number, utxo: bsv.Transaction.UnspentOutput): number => amount + utxo.satoshis, 0)
   return sats
 }
+
+// export async function fetchMinerDetails(): Promise<minerDetail[]> {
+//   // TODO: Implement
+// }
