@@ -1,7 +1,7 @@
 import { compile, bsv } from "scryptlib"
 import { getMerkleRoot } from "./merkleTree"
-import { num2bin } from "./hex"
-import { minerDetail, getMinerPubString } from "./oracle"
+import { int2Hex } from "./hex"
+import { minerDetail, getMinerDetailsHex } from "./oracle"
 
 export type marketDetails = {
   resolve: string
@@ -28,7 +28,7 @@ export function getLockingScriptASMTemplate(): string[] {
 
 export function getLockingScriptASM(minerDetails: minerDetail[]): string[] {
   const asmTemplate = getLockingScriptASMTemplate()
-  asmTemplate[7] = getMinerPubString(minerDetails)
+  asmTemplate[7] = getMinerDetailsHex(minerDetails)
   return asmTemplate
 }
 
@@ -46,14 +46,22 @@ export type entry = {
 export function getEntryHex(entry: entry): string {
   return (
     entry.publicKey.toString() +
-    num2bin(entry.balance.liquidity, 1) +
-    num2bin(entry.balance.sharesFor, 1) +
-    num2bin(entry.balance.sharesAgainst, 1)
+    int2Hex(entry.balance.liquidity, 1) +
+    int2Hex(entry.balance.sharesFor, 1) +
+    int2Hex(entry.balance.sharesAgainst, 1)
   )
 }
 
 export function getBalanceHex(balance: balance): string {
-  return num2bin(balance.liquidity, 1) + num2bin(balance.sharesFor, 1) + num2bin(balance.sharesAgainst, 1)
+  return int2Hex(balance.liquidity, 1) + int2Hex(balance.sharesFor, 1) + int2Hex(balance.sharesAgainst, 1)
+}
+
+export function getBalanceFromHex(hex: string): balance {
+  return {
+    liquidity: parseInt(hex.slice(0, 2), 16),
+    sharesFor: parseInt(hex.slice(2, 4), 16),
+    sharesAgainst: parseInt(hex.slice(4, 6), 16)
+  }
 }
 
 export function getMarketBalance(entries: entry[]): balance {
@@ -75,8 +83,15 @@ export function getMarketBalanceHex(entries: entry[]): string {
   return marketBalance + balanceTableRoot
 }
 
-export function getMarketDecisionHex(status: marketStatus): string {
+export function getMarketStatusHex(status: marketStatus): string {
   const isDecidedHex = status.decided ? "01" : "00"
-  const resultHex = num2bin(status.decision, 1)
+  const resultHex = int2Hex(status.decision, 1)
   return isDecidedHex + resultHex
+}
+
+export function getMarketStatusfromHex(hex: string): marketStatus {
+  return {
+    decided: Boolean(parseInt(hex.slice(0, 2), 16)),
+    decision: parseInt(hex.slice(2, 4), 16)
+  }
 }

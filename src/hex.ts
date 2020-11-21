@@ -6,7 +6,7 @@ export function reverseHex(s: string): string {
   return array.reverse().join("")
 }
 
-export function num2bin(num: number | bigint, byteSize?: number): string {
+export function int2Hex(num: number | bigint, byteSize?: number): string {
   let hex = num.toString(16)
 
   if (byteSize) {
@@ -21,4 +21,8 @@ export function toHex(s: string): string {
     .split("")
     .map(char => ("000" + char.charCodeAt(0).toString(16)).slice(-4))
     .join("")
+}
+
+export function hex2BigInt(hex: string): bigint {
+  return BigInt("0x" + reverseHex(hex))
 }

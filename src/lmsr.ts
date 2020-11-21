@@ -1,5 +1,5 @@
 import { sha256 } from "./sha"
-import { num2bin } from "./hex"
+import { int2Hex } from "./hex"
 
 export const maxShares = 2 ** 7
 export const maxLiquidity = 2 ** 2
@@ -29,7 +29,7 @@ export function getLmsrShas(maxL: number = maxLiquidity, maxS: number = maxShare
 }
 
 export function getLmsrHex(l: number, n: number, m: number): string {
-  return num2bin(l, 1) + num2bin(n, 1) + num2bin(m, 1) + num2bin(lmsrScaled(l, n, m), 6)
+  return int2Hex(l, 1) + int2Hex(n, 1) + int2Hex(m, 1) + int2Hex(lmsrScaled(l, n, m), 6)
 }
 
 export function getPos(l: number, n: number, m: number): number {

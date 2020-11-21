@@ -1,6 +1,6 @@
 import { privKeyToPubKey, sign, rabinSig, rabinPrivKey, rabinPubKey } from "rabinsig"
 
-import { num2bin as bigNum2bin } from "./hex"
+import { int2Hex, hex2BigInt } from "./hex"
 import { num2bin } from "scryptlib"
 
 export type minerDetail = { pubKey: rabinPubKey; votes: number }
@@ -15,20 +15,34 @@ export function isValidMinerDetails(minerDetails: minerDetail[]): boolean {
   return getTotalVotes(minerDetails) === 100
 }
 
-export function getMinerSigHex(signature: rabinSig, keyPos: number): string {
-  return [
-    num2bin(keyPos, 1),
-    bigNum2bin(signature.signature, rabinKeyLength),
-    num2bin(signature.paddingByteCount, 1)
-  ].join("")
-}
-
 export function getMinerDetailHex(minerDetail: minerDetail): string {
-  return bigNum2bin(minerDetail.pubKey, rabinKeyLength) + num2bin(minerDetail.votes, 1)
+  return int2Hex(minerDetail.pubKey, rabinKeyLength) + num2bin(minerDetail.votes, 1)
 }
 
 export function getMinerDetailsHex(minerDetails: minerDetail[]): string {
   return minerDetails.map(getMinerDetailHex).join("")
+}
+
+export function getMinerDetailFromHex(hex: string): minerDetail {
+  const pubKeyHex = hex.slice(0, hex.length - 1)
+  const votesHex = hex.slice(hex.length - 1, hex.length)
+  return {
+    pubKey: hex2BigInt(pubKeyHex),
+    votes: parseInt(votesHex, 16)
+  }
+}
+
+export function getMinerDetailsFromHex(hex: string): minerDetail[] {
+  const minerDetails = hex.match(new RegExp(".{1," + rabinKeyLength.toString() + "}", "g"))
+  return minerDetails ? minerDetails.map(getMinerDetailFromHex) : []
+}
+
+export function getMinerSigHex(signature: rabinSig, keyPos: number): string {
+  return [
+    num2bin(keyPos, 1),
+    int2Hex(signature.signature, rabinKeyLength),
+    num2bin(signature.paddingByteCount, 1)
+  ].join("")
 }
 
 export function getMinerSigsString(minerSigs: rabinSig[]): string {
