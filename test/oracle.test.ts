@@ -17,5 +17,8 @@ const minerDetails: minerDetail[] = [
 
 test("should accurately convert to and from minerDetails", () => {
   const hex = getMinerDetailsHex(minerDetails)
+  const test = getMinerDetailsFromHex(hex)
+
+  expect(test).toEqual(minerDetails)
   expect(getMinerDetailsFromHex(hex)).toEqual(minerDetails)
 })

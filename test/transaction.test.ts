@@ -1,5 +1,6 @@
-import { buildInitTx, fundTx, getAddEntryUnlockingScript } from "../src/transaction"
+import { buildInitTx, fundTx } from "../src/transaction"
 import { privKeyToPubKey } from "rabinsig"
+import { entry } from "../src/pm"
 import bsv from "bsv"
 
 const privKey1 = {
@@ -31,8 +32,18 @@ const marketDetails = {
 }
 
 const privateKey = bsv.PrivateKey.fromRandom()
+const address = privateKey.toAddress()
 
-const liquidity = 1
+const entries: entry[] = [
+  {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 1,
+      sharesFor: 0,
+      sharesAgainst: 0
+    }
+  }
+]
 
 const utxoData = [
   {
@@ -53,8 +64,8 @@ const utxoData = [
 const utxos = utxoData.map(utxo => bsv.Transaction.UnspentOutput.fromObject(utxo))
 
 test("build pm init transaction", () => {
-  const tx = buildInitTx(marketDetails, liquidity, privateKey.publicKey, minerDetails)
-  const funded = fundTx(tx, privateKey, utxos)
+  const tx = buildInitTx(marketDetails, minerDetails, entries)
+  const funded = fundTx(tx, privateKey, address, utxos)
   expect(funded.verify()).toBe(true)
 })
 

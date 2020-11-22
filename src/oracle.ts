@@ -24,8 +24,8 @@ export function getMinerDetailsHex(minerDetails: minerDetail[]): string {
 }
 
 export function getMinerDetailFromHex(hex: string): minerDetail {
-  const pubKeyHex = hex.slice(0, hex.length - 1)
-  const votesHex = hex.slice(hex.length - 1, hex.length)
+  const pubKeyHex = hex.slice(0, hex.length - 2)
+  const votesHex = hex.slice(hex.length - 2, hex.length)
   return {
     pubKey: hex2BigInt(pubKeyHex),
     votes: parseInt(votesHex, 16)
@@ -33,7 +33,7 @@ export function getMinerDetailFromHex(hex: string): minerDetail {
 }
 
 export function getMinerDetailsFromHex(hex: string): minerDetail[] {
-  const minerDetails = hex.match(new RegExp(".{1," + rabinKeyLength.toString() + "}", "g"))
+  const minerDetails = hex.match(new RegExp(".{1," + (rabinKeyLength * 2 + 2).toString() + "}", "g"))
   return minerDetails ? minerDetails.map(getMinerDetailFromHex) : []
 }
 

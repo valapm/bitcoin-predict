@@ -3,6 +3,7 @@ import {
   getLockingScriptASM,
   getMarketStatusHex,
   getMarketStatusfromHex,
+  getMarketBalance,
   getMarketBalanceHex,
   balance,
   marketDetails,
@@ -72,28 +73,29 @@ export function getUpdateLockingScript(prevOut: bsv.Transaction.Output, marketSt
   return bsv.Script.fromASM(newASM)
 }
 
-// export function buildInitTx(
-//   marketDetails: marketDetails,
-//   minerDetails: minerDetail[],
-//   balances: balance[]
-// ): bsv.Transaction {
-//   const tx = new bsv.Transaction()
+export function buildInitTx(
+  marketDetails: marketDetails,
+  minerDetails: minerDetail[],
+  entries: entry[]
+): bsv.Transaction {
+  const marketStatus = { decided: false, decision: 0 }
 
-//   const marketStatus = getMarketStatusHex(balances)
-//   const minerVoteString = getMinerPubString(minerDetails)
+  const script = getLockingScript(minerDetails, marketDetails, marketStatus, entries)
+  const marketBalance = getMarketBalance(entries)
 
-//   const script = getInitLockingScript(minerVoteString, marketDetails, marketStatus)
+  const contractBalance = getLmsrSats(marketBalance.liquidity, marketBalance.sharesFor, marketBalance.sharesAgainst)
 
-//   const contractBalance = getLmsrSats(liquidity, 0, 0)
-//   tx.addOutput(new bsv.Transaction.Output({ script, satoshis: contractBalance }))
+  const tx = new bsv.Transaction()
 
-//   tx.feePerKb(feeb * 1000)
+  tx.addOutput(new bsv.Transaction.Output({ script, satoshis: contractBalance }))
 
-//   // tx.from(utxos)
+  tx.feePerKb(feeb * 1000)
 
-//   // signTx(tx, privateKey, script.toASM(), contractBalance, 0, sighashType)
-//   return tx
-// }
+  // tx.from(utxos)
+
+  // signTx(tx, privateKey, script.toASM(), contractBalance, 0, sighashType)
+  return tx
+}
 
 // export function getAddEntryUnlockingScript(
 //   preimage: string,
@@ -135,19 +137,16 @@ export function getUpdateLockingScript(prevOut: bsv.Transaction.Output, marketSt
 //   const prevOpReturn = prevASM.slice()
 // }
 
-// export function fundTx(
-//   tx: bsv.Transaction,
-//   privateKey: bsv.PrivateKey,
-//   utxos: bsv.Transaction.UnspentOutput[]
-// ): bsv.Transaction {
-//   const address = privateKey.toAddress().toString()
+export function fundTx(
+  tx: bsv.Transaction,
+  privateKey: bsv.PrivateKey,
+  changeAddress: bsv.Address,
+  utxos: bsv.Transaction.UnspentOutput[]
+): bsv.Transaction {
+  tx.change(changeAddress)
+  tx.from(utxos)
+  tx.sign(privateKey)
+  // signTx(tx, privateKey, tx.outputs[0].script.toASM(), contractBalance, 1, sighashType)
 
-//   tx.change(address)
-
-//   tx.from(utxos)
-
-//   tx.sign(privateKey)
-//   // signTx(tx, privateKey, tx.outputs[0].script.toASM(), contractBalance, 1, sighashType)
-
-//   return tx
-// }
+  return tx
+}
