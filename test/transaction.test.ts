@@ -1,15 +1,6 @@
-import {
-  buildInitTx,
-  fundTx,
-  getMinerDetails,
-  getOpReturnData,
-  getMarketDetails,
-  getMarketStatus,
-  getBalance,
-  isValidMarketTx
-} from "../src/transaction"
+import { buildTx, fundTx, isValidMarketTx, getLockingScript, getMarketFromScript } from "../src/transaction"
 import { privKeyToPubKey } from "rabinsig"
-import { entry } from "../src/pm"
+import { entry, getMarketBalance, getBalanceMerkleRoot } from "../src/pm"
 import bsv from "bsv"
 
 const privKey1 = {
@@ -25,7 +16,7 @@ const privKey2 = {
 const pubKey1 = privKeyToPubKey(privKey1.p, privKey1.q)
 const pubKey2 = privKeyToPubKey(privKey2.p, privKey2.q)
 
-const minerDetails = [
+const miners = [
   {
     pubKey: pubKey1,
     votes: 40
@@ -35,10 +26,6 @@ const minerDetails = [
     votes: 60
   }
 ]
-
-const marketDetails = {
-  resolve: "test"
-}
 
 const privateKey = bsv.PrivateKey.fromRandom()
 const address = privateKey.toAddress()
@@ -72,30 +59,23 @@ const utxoData = [
 
 const utxos = utxoData.map(utxo => bsv.Transaction.UnspentOutput.fromObject(utxo))
 
+const market = {
+  details: { resolve: "test" },
+  status: { decided: false, decision: 0 },
+  miners,
+  balance: getMarketBalance(entries),
+  balanceMerkleRoot: getBalanceMerkleRoot(entries)
+}
+
 test("build and fund pm init transaction", () => {
-  const tx = buildInitTx(marketDetails, minerDetails, entries)
+  const tx = buildTx(market)
   const funded = fundTx(tx, privateKey, address, utxos)
   expect(isValidMarketTx(funded, entries)).toBe(true)
 })
 
-test("convert minerDetails to and from script", () => {
-  const tx = buildInitTx(marketDetails, minerDetails, entries)
-  const script = tx.outputs[0].script
-  expect(getMinerDetails(script)).toEqual(minerDetails)
-})
-
-test("convert marketDetails to and from script", () => {
-  const tx = buildInitTx(marketDetails, minerDetails, entries)
-  const script = tx.outputs[0].script
-  const data = getOpReturnData(script)
-  expect(getMarketDetails(data)).toEqual(marketDetails)
-})
-
-test("convert marketStatus to and from script", () => {
-  const tx = buildInitTx(marketDetails, minerDetails, entries)
-  const script = tx.outputs[0].script
-  const data = getOpReturnData(script)
-  expect(getMarketStatus(data)).toEqual({ decided: false, decision: 0 })
+test("convert market to and from script", () => {
+  const script = getLockingScript(market)
+  expect(getMarketFromScript(script)).toEqual(market)
 })
 
 // test("create addEntry unlocking script", () => {

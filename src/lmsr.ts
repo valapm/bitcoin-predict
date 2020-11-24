@@ -1,5 +1,6 @@
 import { sha256 } from "./sha"
 import { int2Hex } from "./hex"
+import { balance } from "./pm"
 
 export const maxShares = 2 ** 7
 export const maxLiquidity = 2 ** 2
@@ -36,6 +37,6 @@ export function getPos(l: number, n: number, m: number): number {
   return (l - 1) * (maxShares + 1) ** 2 + n * (maxShares + 1) + m
 }
 
-export function getLmsrSats(liquidity: number, sharesFor: number, sharesAgainst: number): number {
-  return Math.floor(lmsr(liquidity, sharesFor, sharesAgainst) * satScaling)
+export function getLmsrSats(balance: balance): number {
+  return Math.floor(lmsr(balance.liquidity, balance.sharesFor, balance.sharesAgainst) * satScaling)
 }

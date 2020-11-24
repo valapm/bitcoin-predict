@@ -1,6 +1,7 @@
 import { compile, bsv } from "scryptlib"
 import { getMerkleRoot } from "./merkleTree"
 import { int2Hex, toHex, fromHex } from "./hex"
+import { isHash, hash } from "./sha"
 import { minerDetail, getMinerDetailsHex, isValidMinerDetails } from "./oracle"
 
 export type marketDetails = {
@@ -47,6 +48,7 @@ export type market = {
   status: marketStatus
   details: marketDetails
   balance: balance
+  balanceMerkleRoot: hash
   miners: minerDetail[]
 }
 
@@ -85,11 +87,15 @@ export function getMarketBalance(entries: entry[]): balance {
   )
 }
 
+export function getBalanceMerkleRoot(entries: entry[]): hash {
+  return getMerkleRoot(entries.map(getEntryHex))
+}
+
 export const marketBalanceHexLength = balanceHexLength + 64
 export function getMarketBalanceHex(entries: entry[]): string {
   const marketBalance = getBalanceHex(getMarketBalance(entries))
-  const balanceTableRoot = getMerkleRoot(entries.map(getEntryHex))
-  return marketBalance + balanceTableRoot
+  const balanceTableRoot = getBalanceMerkleRoot(entries)
+  return marketBalance + String(balanceTableRoot)
 }
 
 export const marketStatusHexLength = 4
@@ -131,7 +137,8 @@ export function isValidMarket(market: market): boolean {
     isValidMarketStatus(market.status) &&
     isValidMarketDetails(market.details) &&
     isValidMarketBalance(market.balance) &&
-    isValidMinerDetails(market.miners)
+    isValidMinerDetails(market.miners) &&
+    isHash(market.balanceMerkleRoot)
   )
 }
 

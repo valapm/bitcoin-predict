@@ -16,11 +16,13 @@ import {
   validateEntries,
   market,
   marketStatusHexLength,
-  balanceHexLength
+  balanceHexLength,
+  getBalanceHex
 } from "./pm"
 import { minerDetail, getMinerDetailsFromHex } from "./oracle"
 import { getLmsrSats } from "./lmsr"
 import { getMerkleRoot } from "./merkleTree"
+import { hash } from "./sha"
 
 const feeb = 0.5
 const identifier = "25c78e732e3af9aa593d1f71912775bcb2ada1bf"
@@ -30,16 +32,11 @@ const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | 
 
 const opReturnDataLength = 3
 
-export function getLockingScript(
-  minerDetails: minerDetail[],
-  marketDetails: marketDetails,
-  marketStatus: marketStatus,
-  entries: entry[]
-): bsv.Script {
-  const asm = getLockingScriptASM(minerDetails).join(" ")
-  const marketBalanceHex = getMarketBalanceHex(entries)
-  const marketDetailsHex = getMarketDetailsHex(marketDetails)
-  const marketStatusHex = getMarketStatusHex(marketStatus)
+export function getLockingScript(market: market): bsv.Script {
+  const asm = getLockingScriptASM(market.miners).join(" ")
+  const marketBalanceHex = getBalanceHex(market.balance) + String(market.balanceMerkleRoot)
+  const marketDetailsHex = getMarketDetailsHex(market.details)
+  const marketStatusHex = getMarketStatusHex(market.status)
 
   const fullScript = `${asm} OP_RETURN ${identifier} ${marketDetailsHex} ${marketStatusHex + marketBalanceHex}`
 
@@ -70,29 +67,25 @@ export function getBalance(opReturnData: string[]): balance {
   return getBalanceFromHex(balanceHex)
 }
 
-export function getUpdateLockingScript(prevOut: bsv.Transaction.Output, marketStatus: string): bsv.Script {
-  const asmList = prevOut.script.toASM().split(" ")
-  const newASM = asmList
-    .slice(0, asmList.length - 1)
-    .concat([marketStatus])
-    .join(" ")
-  return bsv.Script.fromASM(newASM)
+export function getBalanceMerkleRoot(opReturnData: string[]): hash {
+  const position = marketStatusHexLength + balanceHexLength
+  return opReturnData[2].slice(position, position + 64)
 }
 
-export function buildInitTx(
-  marketDetails: marketDetails,
-  minerDetails: minerDetail[],
-  entries: entry[]
-): bsv.Transaction {
-  const marketStatus = { decided: false, decision: 0 }
+// export function buildInitTx(
+//   marketDetails: marketDetails,
+//   minerDetails: minerDetail[],
+//   entries: entry[]
+// ): bsv.Transaction {
+//   const status = { decided: false, decision: 0 }
+//   return buildTx(...)
+// }
 
-  const script = getLockingScript(minerDetails, marketDetails, marketStatus, entries)
-  const marketBalance = getMarketBalance(entries)
-
-  const contractBalance = getLmsrSats(marketBalance.liquidity, marketBalance.sharesFor, marketBalance.sharesAgainst)
+export function buildTx(market: market): bsv.Transaction {
+  const script = getLockingScript(market)
+  const contractBalance = getLmsrSats(market.balance)
 
   const tx = new bsv.Transaction()
-
   tx.addOutput(new bsv.Transaction.Output({ script, satoshis: contractBalance }))
 
   tx.feePerKb(feeb * 1000)
@@ -103,47 +96,76 @@ export function buildInitTx(
   return tx
 }
 
-export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean {
-  const script = tx.outputs[0].script
-  const balance = tx.outputs[0].satoshis
+export function getPreimage(prevTx: bsv.Transaction, market: market): SigHashPreimage {
+  const tx = buildTx(market)
+  tx.addInput(
+    bsv.Transaction.Input.fromObject({
+      prevTxId: prevTx.hash,
+      outputIndex: 0,
+      script: prevTx.outputs[0].script
+    })
+  )
+
+  const preimageBuf = bsv.Transaction.sighash.sighashPreimage(
+    tx,
+    sighashType,
+    0,
+    prevTx.outputs[0].script,
+    prevTx.outputs[0].satoshisBN
+  )
+  return new SigHashPreimage(preimageBuf.toString("hex"))
+}
+
+// export function buildUpdateTx(prevOut: bsv.Transaction.Output) {
+//   // TODO:
+// }
+
+export function getMarketFromScript(script: bsv.Script): market {
   const data = getOpReturnData(script)
-  const market: market = {
+  return {
     details: getMarketDetails(data),
     status: getMarketStatus(data),
     miners: getMinerDetails(script),
-    balance: getBalance(data)
+    balance: getBalance(data),
+    balanceMerkleRoot: getBalanceMerkleRoot(data)
   }
-  const hasValidBalance =
-    balance === getLmsrSats(market.balance.liquidity, market.balance.sharesFor, market.balance.sharesAgainst)
+}
+
+export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean {
+  const script = tx.outputs[0].script
+  const balance = tx.outputs[0].satoshis
+  const market = getMarketFromScript(script)
+
+  const hasValidBalance = balance === getLmsrSats(market.balance)
 
   return tx.verify() === true && isValidMarket(market) && validateEntries(market.balance, entries) && hasValidBalance
 }
 
-// export function getAddEntryUnlockingScript(
-//   preimage: string,
-//   liquidity: number,
-//   sharesFor: number,
-//   sharesAgainst: number,
-//   pubKey: string,
-//   newLmsrBalance: number,
-//   newLmsrMerklePath: string,
-//   lastEntry: string,
-//   lastMerklePath: string
-// ): bsv.Script {
-//   const asm = [
-//     new SigHashPreimage(toHex(preimage)),
-//     liquidity,
-//     sharesFor,
-//     sharesAgainst,
-//     new PubKey(pubKey),
-//     newLmsrBalance,
-//     new Bytes(newLmsrMerklePath),
-//     new Bytes(lastEntry),
-//     new Bytes(lastMerklePath)
-//     // "OP_1"
-//   ].join(" ")
-//   return bsv.Script.fromASM(asm)
-// }
+export function getAddEntryUnlockingScript(
+  preimage: string,
+  liquidity: number,
+  sharesFor: number,
+  sharesAgainst: number,
+  pubKey: string,
+  newLmsrBalance: number,
+  newLmsrMerklePath: string,
+  lastEntry: string,
+  lastMerklePath: string
+): bsv.Script {
+  const asm = [
+    new SigHashPreimage(toHex(preimage)),
+    liquidity,
+    sharesFor,
+    sharesAgainst,
+    new PubKey(pubKey),
+    newLmsrBalance,
+    new Bytes(newLmsrMerklePath),
+    new Bytes(lastEntry),
+    new Bytes(lastMerklePath),
+    "OP_1" // Selects scrypt functino to call
+  ].join(" ")
+  return bsv.Script.fromASM(asm)
+}
 
 // export function buildAddEntryTx(
 //   prevTx: bsv.Transaction,

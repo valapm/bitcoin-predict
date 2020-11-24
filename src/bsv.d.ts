@@ -65,6 +65,17 @@ declare module "bsv" {
       toString(): string
     }
 
+    namespace sighash {
+      function sighashPreimage(
+        transaction: Transaction,
+        sighashType: number,
+        inputNumber: number,
+        subscript: Script,
+        satoshisBN: BN,
+        flags?: number
+      ): Buffer
+    }
+
     class Output {
       readonly script: Script
       readonly satoshis: number
@@ -83,6 +94,8 @@ declare module "bsv" {
       readonly sequenceNumber: number
       readonly script: Script
       output?: Output
+
+      static fromObject(data: { prevTxId: string; outputIndex: number; script: Script }): Input
       isValidSignature(tx: Transaction, sig: any): boolean
     }
   }

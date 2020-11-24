@@ -2,9 +2,9 @@ import { sha256 } from "./sha"
 
 export function getMerkleRoot(hashes: string[]): string {
   let array = hashes
-  while (array.length > 1) {
+  do {
     array = merkelizeArray(array)
-  }
+  } while (array.length > 1)
 
   return array[0]
 }
