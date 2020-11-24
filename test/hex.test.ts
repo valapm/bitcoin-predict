@@ -1,4 +1,4 @@
-import { int2Hex, hex2BigInt } from "../src/hex"
+import { int2Hex, hex2BigInt, fromHex, toHex } from "../src/hex"
 
 test("num2hex", () => {
   expect(
@@ -18,4 +18,10 @@ test("hex2num", () => {
   ).toBe(
     0x12f1dd2e0965dc433b0d32b86333b0fb432df592f6108803d7afe51a14a0e867045fe22af85862b8e744700920e0b7e430a192440a714277efb895b51120e4ccn
   )
+})
+
+test("convert from and to hex", () => {
+  const string = "abcdefg123"
+  const hex = toHex(string)
+  expect(fromHex(hex)).toBe(string)
 })

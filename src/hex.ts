@@ -23,6 +23,12 @@ export function toHex(s: string): string {
     .join("")
 }
 
+export function fromHex(s: string): string {
+  const chars = s.match(/.{1,4}/g) || []
+
+  return chars.map(char => String.fromCharCode(parseInt(char, 16))).join("")
+}
+
 export function hex2BigInt(hex: string): bigint {
   return BigInt("0x" + reverseHex(hex))
 }

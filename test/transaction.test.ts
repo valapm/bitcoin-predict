@@ -1,4 +1,13 @@
-import { buildInitTx, fundTx } from "../src/transaction"
+import {
+  buildInitTx,
+  fundTx,
+  getMinerDetails,
+  getOpReturnData,
+  getMarketDetails,
+  getMarketStatus,
+  getBalance,
+  isValidMarketTx
+} from "../src/transaction"
 import { privKeyToPubKey } from "rabinsig"
 import { entry } from "../src/pm"
 import bsv from "bsv"
@@ -63,10 +72,30 @@ const utxoData = [
 
 const utxos = utxoData.map(utxo => bsv.Transaction.UnspentOutput.fromObject(utxo))
 
-test("build pm init transaction", () => {
+test("build and fund pm init transaction", () => {
   const tx = buildInitTx(marketDetails, minerDetails, entries)
   const funded = fundTx(tx, privateKey, address, utxos)
-  expect(funded.verify()).toBe(true)
+  expect(isValidMarketTx(funded, entries)).toBe(true)
+})
+
+test("convert minerDetails to and from script", () => {
+  const tx = buildInitTx(marketDetails, minerDetails, entries)
+  const script = tx.outputs[0].script
+  expect(getMinerDetails(script)).toEqual(minerDetails)
+})
+
+test("convert marketDetails to and from script", () => {
+  const tx = buildInitTx(marketDetails, minerDetails, entries)
+  const script = tx.outputs[0].script
+  const data = getOpReturnData(script)
+  expect(getMarketDetails(data)).toEqual(marketDetails)
+})
+
+test("convert marketStatus to and from script", () => {
+  const tx = buildInitTx(marketDetails, minerDetails, entries)
+  const script = tx.outputs[0].script
+  const data = getOpReturnData(script)
+  expect(getMarketStatus(data)).toEqual({ decided: false, decision: 0 })
 })
 
 // test("create addEntry unlocking script", () => {

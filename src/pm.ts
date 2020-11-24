@@ -1,7 +1,7 @@
 import { compile, bsv } from "scryptlib"
 import { getMerkleRoot } from "./merkleTree"
-import { int2Hex } from "./hex"
-import { minerDetail, getMinerDetailsHex } from "./oracle"
+import { int2Hex, toHex, fromHex } from "./hex"
+import { minerDetail, getMinerDetailsHex, isValidMinerDetails } from "./oracle"
 
 export type marketDetails = {
   resolve: string
@@ -43,6 +43,13 @@ export type entry = {
   publicKey: bsv.PublicKey
 }
 
+export type market = {
+  status: marketStatus
+  details: marketDetails
+  balance: balance
+  miners: minerDetail[]
+}
+
 export function getEntryHex(entry: entry): string {
   return (
     entry.publicKey.toString() +
@@ -52,6 +59,7 @@ export function getEntryHex(entry: entry): string {
   )
 }
 
+export const balanceHexLength = 6
 export function getBalanceHex(balance: balance): string {
   return int2Hex(balance.liquidity, 1) + int2Hex(balance.sharesFor, 1) + int2Hex(balance.sharesAgainst, 1)
 }
@@ -77,12 +85,14 @@ export function getMarketBalance(entries: entry[]): balance {
   )
 }
 
+export const marketBalanceHexLength = balanceHexLength + 64
 export function getMarketBalanceHex(entries: entry[]): string {
   const marketBalance = getBalanceHex(getMarketBalance(entries))
   const balanceTableRoot = getMerkleRoot(entries.map(getEntryHex))
   return marketBalance + balanceTableRoot
 }
 
+export const marketStatusHexLength = 4
 export function getMarketStatusHex(status: marketStatus): string {
   const isDecidedHex = status.decided ? "01" : "00"
   const resultHex = int2Hex(status.decision, 1)
@@ -94,4 +104,42 @@ export function getMarketStatusfromHex(hex: string): marketStatus {
     decided: Boolean(parseInt(hex.slice(0, 2), 16)),
     decision: parseInt(hex.slice(2, 4), 16)
   }
+}
+
+export function getMarketDetailsHex(marketDetails: marketDetails): string {
+  return toHex(JSON.stringify(marketDetails))
+}
+
+export function getMarketDetailsFromHex(hex: string): marketDetails {
+  return JSON.parse(fromHex(hex)) as marketDetails
+}
+
+export function isValidMarketStatus(status: marketStatus): status is marketStatus {
+  return (status.decided === false || status.decided === true) && (status.decision === 1 || status.decision === 0)
+}
+
+export function isValidMarketDetails(details: marketDetails): details is marketDetails {
+  return Boolean(details.resolve)
+}
+
+export function isValidMarketBalance(balance: balance): balance is balance {
+  return balance.liquidity >= 0 && balance.sharesFor >= 0 && balance.sharesAgainst >= 0
+}
+
+export function isValidMarket(market: market): boolean {
+  return (
+    isValidMarketStatus(market.status) &&
+    isValidMarketDetails(market.details) &&
+    isValidMarketBalance(market.balance) &&
+    isValidMinerDetails(market.miners)
+  )
+}
+
+export function validateEntries(balance: balance, entries: entry[]): boolean {
+  const calculatedBalance = getMarketBalance(entries)
+  return (
+    balance.liquidity === calculatedBalance.liquidity &&
+    balance.sharesFor === calculatedBalance.sharesFor &&
+    balance.sharesAgainst === calculatedBalance.sharesAgainst
+  )
 }

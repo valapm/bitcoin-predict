@@ -11,7 +11,7 @@ export function getTotalVotes(minerDetails: minerDetail[]): number {
   return minerDetails.reduce((votes: number, miner: minerDetail) => votes + miner.votes, 0)
 }
 
-export function isValidMinerDetails(minerDetails: minerDetail[]): boolean {
+export function isValidMinerDetails(minerDetails: minerDetail[]): minerDetails is minerDetail[] {
   return getTotalVotes(minerDetails) === 100
 }
 

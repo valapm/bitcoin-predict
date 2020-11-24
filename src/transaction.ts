@@ -9,7 +9,14 @@ import {
   marketDetails,
   entry,
   marketStatus,
-  getBalanceFromHex
+  getBalanceFromHex,
+  getMarketDetailsHex,
+  getMarketDetailsFromHex,
+  isValidMarket,
+  validateEntries,
+  market,
+  marketStatusHexLength,
+  balanceHexLength
 } from "./pm"
 import { minerDetail, getMinerDetailsFromHex } from "./oracle"
 import { getLmsrSats } from "./lmsr"
@@ -21,6 +28,8 @@ const identifier = "25c78e732e3af9aa593d1f71912775bcb2ada1bf"
 const Signature = bsv.crypto.Signature
 const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
 
+const opReturnDataLength = 3
+
 export function getLockingScript(
   minerDetails: minerDetail[],
   marketDetails: marketDetails,
@@ -29,17 +38,17 @@ export function getLockingScript(
 ): bsv.Script {
   const asm = getLockingScriptASM(minerDetails).join(" ")
   const marketBalanceHex = getMarketBalanceHex(entries)
-  const decisionHex = getMarketStatusHex(marketStatus)
+  const marketDetailsHex = getMarketDetailsHex(marketDetails)
+  const marketStatusHex = getMarketStatusHex(marketStatus)
 
-  const fullScript = `${asm} OP_RETURN ${identifier} ${JSON.stringify(marketDetails)} ${decisionHex + marketBalanceHex}`
+  const fullScript = `${asm} OP_RETURN ${identifier} ${marketDetailsHex} ${marketStatusHex + marketBalanceHex}`
 
   return bsv.Script.fromASM(fullScript)
 }
 
-function getOpReturnData(script: bsv.Script): string[] {
+export function getOpReturnData(script: bsv.Script): string[] {
   const asm = script.toASM().split(" ")
-  const opReturnIndex = asm.findIndex((op: string) => op === "OP_RETURN")
-  return asm.slice(opReturnIndex + 1, asm.length - 1)
+  return asm.slice(asm.length - opReturnDataLength, asm.length)
 }
 
 export function getMinerDetails(script: bsv.Script): minerDetail[] {
@@ -47,20 +56,17 @@ export function getMinerDetails(script: bsv.Script): minerDetail[] {
   return getMinerDetailsFromHex(minerHex)
 }
 
-export function getMarketDetails(script: bsv.Script): marketDetails {
-  const data = getOpReturnData(script)
-  return JSON.parse(data[1]) as marketDetails
+export function getMarketDetails(opReturnData: string[]): marketDetails {
+  return getMarketDetailsFromHex(opReturnData[1])
 }
 
-export function getMarketStatus(script: bsv.Script): marketStatus {
-  const data = getOpReturnData(script)
-  const decisionHex = data[2].slice(0, 4)
+export function getMarketStatus(opReturnData: string[]): marketStatus {
+  const decisionHex = opReturnData[2].slice(0, marketStatusHexLength)
   return getMarketStatusfromHex(decisionHex)
 }
 
-export function getBalance(script: bsv.Script): balance {
-  const data = getOpReturnData(script)
-  const balanceHex = data[2].slice(0, 6)
+export function getBalance(opReturnData: string[]): balance {
+  const balanceHex = opReturnData[2].slice(marketStatusHexLength, marketStatusHexLength + balanceHexLength)
   return getBalanceFromHex(balanceHex)
 }
 
@@ -95,6 +101,22 @@ export function buildInitTx(
 
   // signTx(tx, privateKey, script.toASM(), contractBalance, 0, sighashType)
   return tx
+}
+
+export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean {
+  const script = tx.outputs[0].script
+  const balance = tx.outputs[0].satoshis
+  const data = getOpReturnData(script)
+  const market: market = {
+    details: getMarketDetails(data),
+    status: getMarketStatus(data),
+    miners: getMinerDetails(script),
+    balance: getBalance(data)
+  }
+  const hasValidBalance =
+    balance === getLmsrSats(market.balance.liquidity, market.balance.sharesFor, market.balance.sharesAgainst)
+
+  return tx.verify() === true && isValidMarket(market) && validateEntries(market.balance, entries) && hasValidBalance
 }
 
 // export function getAddEntryUnlockingScript(
