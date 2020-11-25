@@ -118,7 +118,7 @@ declare module "bsv" {
     feePerKb(amount: number): this
     sign(privateKey: PrivateKey | string): this
     applySignature(sig: crypto.Signature): this
-    addInput(input: Transaction.Input): this
+    addInput(input: Transaction.Input, script: bsv.Script, satoshis: number): this
     addOutput(output: Transaction.Output): this
     addData(value: Buffer | string): this
     lockUntilDate(time: Date | number): this

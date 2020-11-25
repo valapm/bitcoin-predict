@@ -1,11 +1,14 @@
 import { compile, bsv } from "scryptlib"
-import { getMerkleRoot } from "./merkleTree"
+import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
 import { int2Hex, toHex, fromHex } from "./hex"
 import { isHash, hash } from "./sha"
 import { minerDetail, getMinerDetailsHex, isValidMinerDetails } from "./oracle"
+import { MaxLiquidity, MaxShares } from "./lmsr"
 
 export type marketDetails = {
   resolve: string
+  maxLiquidity?: number
+  maxShares?: number
 }
 
 export type marketStatus = {
@@ -91,6 +94,10 @@ export function getBalanceMerkleRoot(entries: entry[]): hash {
   return getMerkleRoot(entries.map(getEntryHex))
 }
 
+export function getMerklePath(entries: entry[], position: number): string {
+  return getShaMerklePath(position, entries.map(getEntryHex))
+}
+
 export const marketBalanceHexLength = balanceHexLength + 64
 export function getMarketBalanceHex(entries: entry[]): string {
   const marketBalance = getBalanceHex(getMarketBalance(entries))
@@ -132,11 +139,26 @@ export function isValidMarketBalance(balance: balance): balance is balance {
   return balance.liquidity >= 0 && balance.sharesFor >= 0 && balance.sharesAgainst >= 0
 }
 
+export function isValid(market: market): number {
+  return market.details.maxLiquidity || MaxLiquidity
+}
+
+export function hasBalanceWithinLimits(market: market): boolean {
+  const maxLiquidity = market.details.maxLiquidity || MaxLiquidity
+  const maxShares = market.details.maxShares || MaxShares
+  return (
+    market.balance.liquidity <= maxLiquidity &&
+    market.balance.sharesFor <= maxShares &&
+    market.balance.sharesAgainst <= maxShares
+  )
+}
+
 export function isValidMarket(market: market): boolean {
   return (
     isValidMarketStatus(market.status) &&
     isValidMarketDetails(market.details) &&
     isValidMarketBalance(market.balance) &&
+    hasBalanceWithinLimits(market) &&
     isValidMinerDetails(market.miners) &&
     isHash(market.balanceMerkleRoot)
   )

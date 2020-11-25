@@ -1,4 +1,11 @@
-import { buildTx, fundTx, isValidMarketTx, getLockingScript, getMarketFromScript } from "../src/transaction"
+import {
+  buildTx,
+  fundTx,
+  isValidMarketTx,
+  getLockingScript,
+  getMarketFromScript,
+  getPreimage
+} from "../src/transaction"
 import { privKeyToPubKey } from "rabinsig"
 import { entry, getMarketBalance, getBalanceMerkleRoot } from "../src/pm"
 import bsv from "bsv"
@@ -78,9 +85,11 @@ test("convert market to and from script", () => {
   expect(getMarketFromScript(script)).toEqual(market)
 })
 
-// test("create addEntry unlocking script", () => {
-//   getAddEntryUnlockingScript()
-// })
+test("create addEntry unlocking script", () => {
+  const tx = buildTx(market)
+  const preimage = getPreimage(tx, market)
+  console.log(preimage)
+})
 
 // function getMinerSigs(minerPrivKeys: rabinPrivKey[], vote: number): rabinSig[] {
 //   return minerPrivKeys.map(privKey => {

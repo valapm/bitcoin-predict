@@ -1,17 +1,30 @@
 import { getLmsrShas, getPos, getLmsrHex } from "../src/lmsr"
 import { getMerklePath, verifyLeaf, getMerkleRoot } from "../src/merkleTree"
 import { sha256 } from "../src/sha"
+import { balance } from "../src/pm"
 
 test("generate and verify lmsr hashes", () => {
+  const prevBalance: balance = {
+    liquidity: 1,
+    sharesFor: 1,
+    sharesAgainst: 1
+  }
+
+  const newBalance: balance = {
+    liquidity: 1,
+    sharesFor: 2,
+    sharesAgainst: 1
+  }
+
   const shas = getLmsrShas()
-  const prevPos = getPos(1, 1, 1)
-  const newPos = getPos(1, 2, 1)
+  const prevPos = getPos(prevBalance)
+  const newPos = getPos(newBalance)
   const prevMerklePath = getMerklePath(prevPos, shas)
   const newMerklePath = getMerklePath(newPos, shas)
   const merkleRoot = getMerkleRoot(shas)
 
-  const prevValue = getLmsrHex(1, 1, 1)
-  const newValue = getLmsrHex(1, 2, 1)
+  const prevValue = getLmsrHex(prevBalance)
+  const newValue = getLmsrHex(newBalance)
 
   // console.log(prevMerklePath)
   // console.log(newMerklePath)
