@@ -1,9 +1,10 @@
-import { compile, bsv } from "scryptlib"
+import { compile, bsv, buildContractClass } from "scryptlib"
 import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
 import { int2Hex, toHex, fromHex } from "./hex"
-import { isHash, hash } from "./sha"
+import { isHash, hash, sha256 } from "./sha"
 import { minerDetail, getMinerDetailsHex, isValidMinerDetails } from "./oracle"
 import { MaxLiquidity, MaxShares } from "./lmsr"
+import { ContractDescription } from "scryptlib/dist/contract"
 
 export type marketDetails = {
   resolve: string
@@ -16,17 +17,19 @@ export type marketStatus = {
   decision: number
 }
 
-type contract = {
-  asm: string
-}
+export type Token = unknown
 
 export function getCompiledPM(): void {
   const contractPath = require.resolve("scrypt_boilerplate/contracts/predictionMarket.scrypt")
   compile({ path: contractPath }, { desc: true })
 }
 
+// export function getContractDescription(): ContractDescription {
+//   return require("../predictionMarket.json") as ContractDescription
+// }
+
 export function getLockingScriptASMTemplate(): string[] {
-  const compiled = require("../predictionMarket.json") as contract
+  const compiled = require("../predictionMarket.json") as ContractDescription
   return compiled.asm.split(" ")
 }
 
@@ -35,6 +38,11 @@ export function getLockingScriptASM(minerDetails: minerDetail[]): string[] {
   asmTemplate[7] = getMinerDetailsHex(minerDetails)
   return asmTemplate
 }
+
+// export function getToken(miners: minerDetail): Token {
+//   const Token = buildContractClass(require("../predictionMarket.json"))
+//   return new Token(getMinerDetailsHex(miners))
+// }
 
 export type balance = {
   liquidity: number
@@ -47,7 +55,7 @@ export type entry = {
   publicKey: bsv.PublicKey
 }
 
-export type market = {
+export type marketInfo = {
   status: marketStatus
   details: marketDetails
   balance: balance
@@ -91,11 +99,14 @@ export function getMarketBalance(entries: entry[]): balance {
 }
 
 export function getBalanceMerkleRoot(entries: entry[]): hash {
-  return getMerkleRoot(entries.map(getEntryHex))
+  return getMerkleRoot(entries.map(entry => sha256(getEntryHex(entry))))
 }
 
 export function getMerklePath(entries: entry[], position: number): string {
-  return getShaMerklePath(position, entries.map(getEntryHex))
+  return getShaMerklePath(
+    position,
+    entries.map(entry => sha256(getEntryHex(entry)))
+  )
 }
 
 export const marketBalanceHexLength = balanceHexLength + 64
@@ -139,21 +150,21 @@ export function isValidMarketBalance(balance: balance): balance is balance {
   return balance.liquidity >= 0 && balance.sharesFor >= 0 && balance.sharesAgainst >= 0
 }
 
-export function isValid(market: market): number {
-  return market.details.maxLiquidity || MaxLiquidity
-}
+// export function isValid(marketInfo: marketInfo): number {
+//   return marketInfo.details.maxLiquidity || MaxLiquidity
+// }
 
-export function hasBalanceWithinLimits(market: market): boolean {
-  const maxLiquidity = market.details.maxLiquidity || MaxLiquidity
-  const maxShares = market.details.maxShares || MaxShares
+export function hasBalanceWithinLimits(marketInfo: marketInfo): boolean {
+  const maxLiquidity = marketInfo.details.maxLiquidity || MaxLiquidity
+  const maxShares = marketInfo.details.maxShares || MaxShares
   return (
-    market.balance.liquidity <= maxLiquidity &&
-    market.balance.sharesFor <= maxShares &&
-    market.balance.sharesAgainst <= maxShares
+    marketInfo.balance.liquidity <= maxLiquidity &&
+    marketInfo.balance.sharesFor <= maxShares &&
+    marketInfo.balance.sharesAgainst <= maxShares
   )
 }
 
-export function isValidMarket(market: market): boolean {
+export function isValidMarketInfo(market: marketInfo): boolean {
   return (
     isValidMarketStatus(market.status) &&
     isValidMarketDetails(market.details) &&
@@ -171,4 +182,8 @@ export function validateEntries(balance: balance, entries: entry[]): boolean {
     balance.sharesFor === calculatedBalance.sharesFor &&
     balance.sharesAgainst === calculatedBalance.sharesAgainst
   )
+}
+
+export function isSameEntry(entry1: entry, entry2: entry): boolean {
+  return entry1.publicKey.toString() === entry2.publicKey.toString()
 }

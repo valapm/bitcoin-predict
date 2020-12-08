@@ -4,7 +4,9 @@ import {
   isValidMarketTx,
   getLockingScript,
   getMarketFromScript,
-  getPreimage
+  getPreimage,
+  getAddEntryTx,
+  isValidMarketUpdateTx
 } from "../src/transaction"
 import { privKeyToPubKey } from "rabinsig"
 import { entry, getMarketBalance, getBalanceMerkleRoot } from "../src/pm"
@@ -34,7 +36,7 @@ const miners = [
   }
 ]
 
-const privateKey = bsv.PrivateKey.fromRandom()
+const privateKey = bsv.PrivateKey.fromString("Kys3cyL5HZ4upzwWsnirv4urUeczpnweiJ2zY5EDBCkRZ5j2TTdj")
 const address = privateKey.toAddress()
 
 const entries: entry[] = [
@@ -85,10 +87,22 @@ test("convert market to and from script", () => {
   expect(getMarketFromScript(script)).toEqual(market)
 })
 
-test("create addEntry unlocking script", () => {
+test("add entry", () => {
   const tx = buildTx(market)
-  const preimage = getPreimage(tx, market)
-  console.log(preimage)
+  const newEntry: entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 0,
+      sharesFor: 1,
+      sharesAgainst: 0
+    }
+  }
+
+  const newTx = getAddEntryTx(tx, entries, newEntry)
+
+  const newEntries = entries.concat([newEntry])
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
 // function getMinerSigs(minerPrivKeys: rabinPrivKey[], vote: number): rabinSig[] {

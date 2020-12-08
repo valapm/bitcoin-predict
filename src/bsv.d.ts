@@ -14,7 +14,7 @@ declare module "bsv" {
     class BN {}
 
     namespace ECDSA {
-      function sign(message: Buffer, key: PrivateKey): Signature
+      function sign(hashbuf: Buffer, privkey: PrivateKey, endian: string): Signature
       function verify(hashbuf: Buffer, sig: Signature, pubkey: PublicKey, endian?: "little"): boolean
     }
 
@@ -44,6 +44,14 @@ declare module "bsv" {
       static SIGHASH_FORKID: number
       static SIGHASH_ANYONECANPAY: number
       toString(): string
+      set(obj: object): Signature
+    }
+  }
+
+  export namespace encoding {
+    class BufferReader {
+      constructor(buf: string | Buffer)
+      readReverse(len?: number): Buffer
     }
   }
 
@@ -95,7 +103,7 @@ declare module "bsv" {
       readonly script: Script
       output?: Output
 
-      static fromObject(data: { prevTxId: string; outputIndex: number; script: Script }): Input
+      static fromObject(data: { prevTxId: string; outputIndex: number; script: Script; output?: Output }): Input
       isValidSignature(tx: Transaction, sig: any): boolean
     }
   }
@@ -118,7 +126,7 @@ declare module "bsv" {
     feePerKb(amount: number): this
     sign(privateKey: PrivateKey | string): this
     applySignature(sig: crypto.Signature): this
-    addInput(input: Transaction.Input, script: bsv.Script, satoshis: number): this
+    addInput(input: Transaction.Input, script?: bsv.Script, satoshis?: number): this
     addOutput(output: Transaction.Output): this
     addData(value: Buffer | string): this
     lockUntilDate(time: Date | number): this
@@ -342,6 +350,17 @@ declare module "bsv" {
     function empty(): Script
     namespace Interpreter {
       const SCRIPT_ENABLE_SIGHASH_FORKID: any
+      const SCRIPT_ENABLE_MAGNETIC_OPCODES: any
+      const SCRIPT_ENABLE_MONOLITH_OPCODES: any
+      const SCRIPT_VERIFY_STRICTENC: any
+      const SCRIPT_VERIFY_LOW_S: any
+      const SCRIPT_VERIFY_NULLFAIL: any
+      const SCRIPT_VERIFY_DERSIG: any
+      const SCRIPT_VERIFY_MINIMALDATA: any
+      const SCRIPT_VERIFY_NULLDUMMY: any
+      const SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS: any
+      const SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY: any
+      const SCRIPT_VERIFY_CHECKSEQUENCEVERIFY: any
     }
 
     function Interpreter(): {
@@ -349,9 +368,9 @@ declare module "bsv" {
         inputScript: Script,
         outputScript: Script,
         txn: Transaction,
-        nin: Number,
-        flags: any,
-        satoshisBN: crypto.BN
+        nin?: Number,
+        flags?: any,
+        satoshisBN?: crypto.BN
       ) => boolean
     }
   }
