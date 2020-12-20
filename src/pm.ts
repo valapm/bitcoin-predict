@@ -1,10 +1,54 @@
-import { compile, bsv, buildContractClass } from "scryptlib"
+import { compile, bsv, buildContractClass, SigHashPreimage, PubKey, Bytes, Sig } from "scryptlib"
 import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
 import { int2Hex, toHex, fromHex } from "./hex"
 import { isHash, hash, sha256 } from "./sha"
 import { minerDetail, getMinerDetailsHex, isValidMinerDetails } from "./oracle"
 import { MaxLiquidity, MaxShares } from "./lmsr"
-import { ContractDescription } from "scryptlib/dist/contract"
+import { ContractDescription, AbstractContract } from "scryptlib/dist/contract"
+import { FunctionCall } from "scryptlib/dist/abi"
+
+const identifier = "25c78e732e3af9aa593d1f71912775bcb2ada1bf"
+
+interface PM extends AbstractContract {
+  addEntry(
+    preimage: SigHashPreimage,
+    liquidity: number,
+    sharesFor: number,
+    sharesAgainst: number,
+    publicKey: PubKey,
+    newLmsrBalance: number,
+    newLmsrMerklePath: Bytes,
+    lastEntry: Bytes,
+    lastMerklePath: Bytes
+  ): FunctionCall
+
+  updateEntry(
+    preimage: SigHashPreimage,
+    liquidity: number,
+    sharesFor: number,
+    sharesAgainst: number,
+    prevLiquidity: number,
+    prevSharesFor: number,
+    prevSharesAgainst: number,
+    publicKey: PubKey,
+    signature: Sig,
+    newLmsrBalance: number,
+    newLmsrMerklePath: Bytes,
+    merklePath: Bytes
+  ): FunctionCall
+
+  redeem(
+    txPreimage: SigHashPreimage,
+    prevLiquidity: number,
+    prevSharesFor: number,
+    prevSharesAgainst: number,
+    publicKey: PubKey,
+    signature: Sig,
+    merklePath: Bytes
+  ): FunctionCall
+
+  decide(txPreimage: Sig, result: number, minerSigs: Bytes): FunctionCall
+}
 
 export type marketDetails = {
   resolve: string
@@ -16,8 +60,6 @@ export type marketStatus = {
   decided: boolean
   decision: number
 }
-
-export type Token = unknown
 
 export function getCompiledPM(): void {
   const contractPath = require.resolve("scrypt_boilerplate/contracts/predictionMarket.scrypt")
@@ -43,6 +85,19 @@ export function getLockingScriptASM(minerDetails: minerDetail[]): string[] {
 //   const Token = buildContractClass(require("../predictionMarket.json"))
 //   return new Token(getMinerDetailsHex(miners))
 // }
+
+export function getToken(market: marketInfo): PM {
+  const Token = buildContractClass(require("../predictionMarket.json"))
+  const token = new Token(new Bytes(getMinerDetailsHex(market.miners))) as PM
+
+  const marketBalanceHex = getBalanceHex(market.balance) + String(market.balanceMerkleRoot)
+  const marketDetailsHex = getMarketDetailsHex(market.details)
+  const marketStatusHex = getMarketStatusHex(market.status)
+
+  token.setDataPart(`${identifier} ${marketDetailsHex} ${marketStatusHex + marketBalanceHex}`)
+
+  return token
+}
 
 export type balance = {
   liquidity: number

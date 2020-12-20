@@ -2,7 +2,7 @@ import {
   buildTx,
   fundTx,
   isValidMarketTx,
-  getLockingScript,
+  // getLockingScript,
   getMarketFromScript,
   getPreimage,
   getAddEntryTx,
@@ -10,7 +10,8 @@ import {
 } from "../src/transaction"
 import { privKeyToPubKey } from "rabinsig"
 import { entry, getMarketBalance, getBalanceMerkleRoot } from "../src/pm"
-import bsv from "bsv"
+// import bsv from "bsv"
+import { bsv } from "scryptlib"
 
 const privKey1 = {
   p: 3097117482495218740761570398276008894011381249145414887346233174147008460690669803628686127894575795412733149071918669075694907431747167762627687052467n,
@@ -82,10 +83,10 @@ test("build and fund pm init transaction", () => {
   expect(isValidMarketTx(funded, entries)).toBe(true)
 })
 
-test("convert market to and from script", () => {
-  const script = getLockingScript(market)
-  expect(getMarketFromScript(script)).toEqual(market)
-})
+// test("convert market to and from script", () => {
+//   const script = getLockingScript(market)
+//   expect(getMarketFromScript(script)).toEqual(market)
+// })
 
 test("add entry", () => {
   const tx = buildTx(market)

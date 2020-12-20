@@ -103,6 +103,12 @@ declare module "bsv" {
       readonly script: Script
       output?: Output
 
+      constructor(
+        data: { prevTxId: string; outputIndex: number; script: Script; output?: Output },
+        lockingScript?: bsv.Script,
+        prevSats?: number
+      )
+
       static fromObject(data: { prevTxId: string; outputIndex: number; script: Script; output?: Output }): Input
       isValidSignature(tx: Transaction, sig: any): boolean
     }
