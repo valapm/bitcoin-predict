@@ -111,39 +111,18 @@ export function buildTx(market: marketInfo): bsv.Transaction {
 }
 
 export function getUpdateTx(
-  prevTxId: hash,
-  market: marketInfo,
-  unlockingScript: bsv.Script = bsv.Script.empty()
-): bsv.Transaction {
-  const tx = buildTx(market)
-  tx.addInput(
-    bsv.Transaction.Input.fromObject({
-      prevTxId,
-      outputIndex: 0,
-      script: unlockingScript,
-      output: tx.outputs[0]
-    })
-  )
-  return tx
-}
-
-export function getUpdateTxAlt(
   prevTx: bsv.Transaction,
   market: marketInfo,
   unlockingScript: bsv.Script = bsv.Script.empty()
 ): bsv.Transaction {
   const tx = buildTx(market)
   tx.addInput(
-    new bsv.Transaction.Input(
-      {
-        prevTxId: prevTx.hash,
-        outputIndex: 0,
-        script: unlockingScript,
-        output: prevTx.outputs[0]
-      },
-      prevTx.outputs[0].script,
-      prevTx.outputs[0].satoshis
-    )
+    bsv.Transaction.Input.fromObject({
+      prevTxId: prevTx.hash,
+      outputIndex: 0,
+      script: unlockingScript,
+      output: prevTx.outputs[0] // prevTx of newTx here?
+    })
   )
   return tx
 }
@@ -202,7 +181,6 @@ export function getAddEntryTx(prevTx: bsv.Transaction, prevEntries: entry[], ent
   const newEntries = prevEntries.concat([entry])
   const newBalance = getMarketBalance(newEntries)
   const newLmsrBalance = lmsrScaled(newBalance)
-  const newSatBalance = getLmsrSats(newBalance)
 
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
 
@@ -212,10 +190,8 @@ export function getAddEntryTx(prevTx: bsv.Transaction, prevEntries: entry[], ent
     balanceMerkleRoot: getMerkleRoot(newEntries)
   }
 
-  const newTx = getUpdateTxAlt(prevTx, newMarket)
-  // const newTx = getUpdateTx(prevTx.hash, newMarket) // Has same script codePart as prexTx; Has right input format
-  const preimage = getPreimage(prevTx, newTx).toString("hex") // same output as scriptlib function
-
+  const newTx = getUpdateTx(prevTx, newMarket)
+  const preimage = getPreimage(prevTx, newTx).toString("hex")
   const lmsrShas = getLmsrShas(newMarket.details.maxLiquidity, newMarket.details.maxShares)
   const lmsrMerklePath = getLmsrMerklePath(newBalance, lmsrShas)
 
@@ -235,19 +211,6 @@ export function getAddEntryTx(prevTx: bsv.Transaction, prevEntries: entry[], ent
   const token = getToken(prevMarket)
 
   token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
-  const test = token
-    .addEntry(
-      new SigHashPreimage(preimage),
-      entry.balance.liquidity,
-      entry.balance.sharesFor,
-      entry.balance.sharesAgainst,
-      new PubKey(entry.publicKey.toString()),
-      newLmsrBalance,
-      new Bytes(lmsrMerklePath),
-      new Bytes(lastEntry),
-      new Bytes(lastMerklePath)
-    )
-    .verify()
 
   const unlockingScript = token
     .addEntry(
@@ -263,7 +226,7 @@ export function getAddEntryTx(prevTx: bsv.Transaction, prevEntries: entry[], ent
     )
     .toScript() as bsv.Script
 
-  return getUpdateTx(prevTx.hash, newMarket, unlockingScript)
+  return getUpdateTx(prevTx, newMarket, unlockingScript)
 }
 
 export function getSignature(preimage: Buffer, privateKey: bsv.PrivateKey): bsv.crypto.Signature {
@@ -304,7 +267,7 @@ export function getUpdateEntryTx(
     balanceMerkleRoot: getMerkleRootByPath(sha256(getEntryHex(entry)), merklePath)
   }
 
-  const newTx = getUpdateTx(prevTx.hash, newMarket)
+  const newTx = getUpdateTx(prevTx, newMarket)
 
   const preimage = getPreimage(prevTx, newTx)
 
@@ -333,7 +296,7 @@ export function getUpdateEntryTx(
     )
     .toScript() as bsv.Script
 
-  return getUpdateTx(prevTx.hash, newMarket, unlockingScript)
+  return getUpdateTx(prevTx, newMarket, unlockingScript)
 }
 
 // export function buildAddEntryTx(

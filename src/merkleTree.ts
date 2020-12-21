@@ -18,7 +18,7 @@ export function merkelizeArray(array: string[]): string[] {
       reduced.push(newHash)
     }
   }
-  if (array.length % 2 == 1) reduced.push(sha256(array[array.length - 1].repeat(2)))
+  if (array.length % 2 == 1) reduced.push(sha256(array[array.length - 1].repeat(2))) // FIXME: Do not reuse previous entry
   return reduced
 }
 
