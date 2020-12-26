@@ -2,16 +2,15 @@ import {
   buildTx,
   fundTx,
   isValidMarketTx,
-  // getLockingScript,
-  getMarketFromScript,
-  getPreimage,
+  getUpdateEntryTx,
+  getRedeemTx,
   getAddEntryTx,
   isValidMarketUpdateTx
 } from "../src/transaction"
 import { privKeyToPubKey } from "rabinsig"
-import { entry, getMarketBalance, getBalanceMerkleRoot } from "../src/pm"
-// import bsv from "bsv"
+import { entry, getMarketBalance, getBalanceMerkleRoot, balance, marketInfo } from "../src/pm"
 import { bsv } from "scryptlib"
+import { cloneDeep } from "lodash"
 
 const privKey1 = {
   p: 3097117482495218740761570398276008894011381249145414887346233174147008460690669803628686127894575795412733149071918669075694907431747167762627687052467n,
@@ -69,7 +68,7 @@ const utxoData = [
 
 const utxos = utxoData.map(utxo => bsv.Transaction.UnspentOutput.fromObject(utxo))
 
-const market = {
+const market: marketInfo = {
   details: { resolve: "test" },
   status: { decided: false, decision: 0 },
   miners,
@@ -102,6 +101,69 @@ test("add entry", () => {
   const newTx = getAddEntryTx(tx, entries, newEntry)
 
   const newEntries = entries.concat([newEntry])
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+test("update entry", () => {
+  const tx = buildTx(market)
+
+  const newBalance: balance = {
+    liquidity: 1,
+    sharesFor: 1,
+    sharesAgainst: 0
+  }
+
+  const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey)
+
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance.sharesFor += 1
+
+  const newEntries = [newEntry]
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+test("invalid redeem balance", () => {
+  const tx = buildTx(market)
+
+  const newTx = getRedeemTx(tx, entries, privateKey)
+
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance.sharesFor = 0
+  newEntry.balance.sharesAgainst = 0
+
+  const newEntries = [newEntry]
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(false)
+})
+
+test("redeem balance", () => {
+  const entriesWithBalance: entry[] = [
+    {
+      publicKey: privateKey.publicKey,
+      balance: {
+        liquidity: 1,
+        sharesFor: 1,
+        sharesAgainst: 0
+      }
+    }
+  ]
+
+  const resolvedMarket = cloneDeep(market)
+  resolvedMarket.status = {
+    decided: true,
+    decision: 1
+  }
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot(entriesWithBalance)
+  resolvedMarket.balance = getMarketBalance(entriesWithBalance)
+
+  const tx = buildTx(resolvedMarket)
+
+  const newTx = getRedeemTx(tx, entriesWithBalance, privateKey)
+
+  const newEntries = cloneDeep(entriesWithBalance)
+  newEntries[0].balance.sharesFor = 0
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })

@@ -45,6 +45,7 @@ declare module "bsv" {
       static SIGHASH_ANYONECANPAY: number
       toString(): string
       set(obj: object): Signature
+      toTxFormat(): Buffer
     }
   }
 
@@ -86,7 +87,7 @@ declare module "bsv" {
 
     class Output {
       readonly script: Script
-      readonly satoshis: number
+      satoshis: number
       readonly satoshisBN: crypto.BN
       spentTxId: string | null
       constructor(data: object)
@@ -110,6 +111,8 @@ declare module "bsv" {
       )
 
       static fromObject(data: { prevTxId: string; outputIndex: number; script: Script; output?: Output }): Input
+
+      setScript(script: Script): Input
       isValidSignature(tx: Transaction, sig: any): boolean
     }
   }
