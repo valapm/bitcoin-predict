@@ -22,13 +22,14 @@ import {
   getToken,
   getBalanceMerkleRoot as getMerkleRoot
 } from "./pm"
-import { minerDetail, getMinerDetailsFromHex } from "./oracle"
+import { minerDetail, getMinerDetailsFromHex, getMinerSigsString } from "./oracle"
 import { getLmsrSats, getLmsrShas, getLmsrMerklePath, lmsrScaled, SatScaling } from "./lmsr"
 import { hash } from "./sha"
 import { getMerkleRootByPath } from "./merkleTree"
 import { int2Hex } from "./hex"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
+import { rabinSig } from "rabinsig"
 
 const feeb = 0.5
 
@@ -374,18 +375,6 @@ export function getRedeemTx(
 
   token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
 
-  const result = token
-    .redeem(
-      new SigHashPreimage(preimage.toString("hex")),
-      oldEntry.balance.liquidity,
-      oldEntry.balance.sharesFor,
-      oldEntry.balance.sharesAgainst,
-      new PubKey(publicKey.toString()),
-      new Sig(signature.toString("hex")),
-      new Bytes(merklePath)
-    )
-    .verify()
-
   const unlockingScript = token
     .redeem(
       new SigHashPreimage(preimage.toString("hex")),
@@ -396,6 +385,33 @@ export function getRedeemTx(
       new Sig(signature.toString("hex")),
       new Bytes(merklePath)
     )
+    .toScript() as bsv.Script
+
+  newTx.inputs[0].setScript(unlockingScript)
+  return newTx
+}
+
+export function getDecideTx(prevTx: bsv.Transaction, result: 1 | 0, signatures: rabinSig[]): bsv.Transaction {
+  const sigHex = getMinerSigsString(signatures)
+
+  const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
+  const newMarket = {
+    ...prevMarket,
+    status: {
+      decided: true,
+      decision: result
+    }
+  }
+
+  const newTx = getUpdateTx(prevTx, newMarket)
+  const preimage = getPreimage(prevTx, newTx)
+
+  const token = getToken(prevMarket)
+
+  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
+
+  const unlockingScript = token
+    .decide(new SigHashPreimage(preimage.toString("hex")), result, new Bytes(sigHex))
     .toScript() as bsv.Script
 
   newTx.inputs[0].setScript(unlockingScript)

@@ -5,19 +5,21 @@ import {
   getUpdateEntryTx,
   getRedeemTx,
   getAddEntryTx,
+  getDecideTx,
   isValidMarketUpdateTx
 } from "../src/transaction"
-import { privKeyToPubKey } from "rabinsig"
+import { privKeyToPubKey, rabinPrivKey } from "rabinsig"
 import { entry, getMarketBalance, getBalanceMerkleRoot, balance, marketInfo } from "../src/pm"
 import { bsv } from "scryptlib"
+import { getSignature } from "../src/oracle"
 import { cloneDeep } from "lodash"
 
-const privKey1 = {
+const privKey1: rabinPrivKey = {
   p: 3097117482495218740761570398276008894011381249145414887346233174147008460690669803628686127894575795412733149071918669075694907431747167762627687052467n,
   q: 650047001204168007801848889418948532353073326909497585177081016045346562912146630794965372241635285465610094863279373295872825824127728241709483771067n
 }
 
-const privKey2 = {
+const privKey2: rabinPrivKey = {
   p: 5282996768621071377953148561714230757875959595062017918330039194973991105026912034418577469175391947647260152227014115175065212479767996019477136300223n,
   q: 650047001204168007801848889418948532353073326909497585177081016045346562912146630794965372241635285465610094863279373295872825824127728241709483771067n
 }
@@ -166,6 +168,18 @@ test("redeem balance", () => {
   newEntries[0].balance.sharesFor = 0
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+test("verify signatures", () => {
+  const decision = 1
+  const sig1 = getSignature(decision, privKey1)
+  const sig2 = getSignature(decision, privKey2)
+
+  const tx = buildTx(market)
+
+  const newTx = getDecideTx(tx, decision, [sig1, sig2])
+
+  expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
 })
 
 // function getMinerSigs(minerPrivKeys: rabinPrivKey[], vote: number): rabinSig[] {
