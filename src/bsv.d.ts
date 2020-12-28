@@ -114,6 +114,14 @@ declare module "bsv" {
 
       setScript(script: Script): Input
       isValidSignature(tx: Transaction, sig: any): boolean
+
+      getSignatures(
+        transaction: Transaction,
+        privateKey: PrivateKey,
+        index: number,
+        sigtype?: number
+      ): crypto.Signature[]
+      addSignature(transaction: Transaction, signature: crypto.Signature): Input
     }
   }
 
@@ -147,6 +155,7 @@ declare module "bsv" {
     getLockTime(): Date | number
 
     verify(): string | boolean
+    getSerializationError(): Error | void
     isCoinbase(): boolean
 
     enableRBF(): this

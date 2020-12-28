@@ -54,16 +54,16 @@ const entries: entry[] = [
 
 const utxoData = [
   {
-    address: "18VfMk5AUgaJWiDBCvVN9ckmZnSjc2sYdW",
-    txid: "740d05345f5acbbfe5ef042c54a996367d0f43fd8c9f5242c05f01b99d3ed9ec",
+    address: "1KCrKrbmjiyHhx8Wp8zKCqLgAbUV5B8okY",
+    txid: "4fdfb21063a59f2c524f5d690b2f3fa728ed4fb5761a3e472839eb4aed367d63",
     vout: 1,
-    amount: 0.00008,
-    satoshis: 8000,
+    amount: 0.1,
+    satoshis: 10000000,
     value: 8000,
     height: 661843,
     confirmations: 82,
-    scriptPubKey: "76a91452348bf81d90282c6b38d11a24474cd498ccd29c88ac",
-    script: "76a91452348bf81d90282c6b38d11a24474cd498ccd29c88ac",
+    scriptPubKey: "76a914c7b003a282cae060ade434c349f497189b7a71cd88ac",
+    script: "76a914c7b003a282cae060ade434c349f497189b7a71cd88ac",
     outputIndex: 1
   }
 ]
@@ -80,8 +80,8 @@ const market: marketInfo = {
 
 test("build and fund pm init transaction", () => {
   const tx = buildTx(market)
-  const funded = fundTx(tx, privateKey, address, utxos)
-  expect(isValidMarketTx(funded, entries)).toBe(true)
+  fundTx(tx, privateKey, address, utxos)
+  expect(isValidMarketTx(tx, entries)).toBe(true)
 })
 
 // test("convert market to and from script", () => {
@@ -91,6 +91,8 @@ test("build and fund pm init transaction", () => {
 
 test("add entry", () => {
   const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+
   const newEntry: entry = {
     publicKey: privateKey.publicKey,
     balance: {
@@ -101,6 +103,7 @@ test("add entry", () => {
   }
 
   const newTx = getAddEntryTx(tx, entries, newEntry)
+  fundTx(newTx, privateKey, address, utxos)
 
   const newEntries = entries.concat([newEntry])
 
@@ -109,6 +112,7 @@ test("add entry", () => {
 
 test("update entry", () => {
   const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
     liquidity: 1,
@@ -117,6 +121,7 @@ test("update entry", () => {
   }
 
   const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey)
+  fundTx(newTx, privateKey, address, utxos)
 
   const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance.sharesFor += 1
@@ -128,8 +133,10 @@ test("update entry", () => {
 
 test("invalid redeem balance", () => {
   const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
 
   const newTx = getRedeemTx(tx, entries, privateKey)
+  fundTx(newTx, privateKey, address, utxos)
 
   const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance.sharesFor = 0
@@ -138,6 +145,20 @@ test("invalid redeem balance", () => {
   const newEntries = [newEntry]
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(false)
+})
+
+test("verify signatures", () => {
+  const decision = 1
+  const sig1 = getSignature(decision, privKey1)
+  const sig2 = getSignature(decision, privKey2)
+
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newTx = getDecideTx(tx, decision, [sig1, sig2])
+  fundTx(newTx, privateKey, address, utxos)
+
+  expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
 })
 
 test("redeem balance", () => {
@@ -161,29 +182,109 @@ test("redeem balance", () => {
   resolvedMarket.balance = getMarketBalance(entriesWithBalance)
 
   const tx = buildTx(resolvedMarket)
+  fundTx(tx, privateKey, address, utxos)
 
   const newTx = getRedeemTx(tx, entriesWithBalance, privateKey)
+  fundTx(newTx, privateKey, address, utxos)
 
   const newEntries = cloneDeep(entriesWithBalance)
   newEntries[0].balance.sharesFor = 0
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
-
-test("verify signatures", () => {
-  const decision = 1
-  const sig1 = getSignature(decision, privKey1)
-  const sig2 = getSignature(decision, privKey2)
-
-  const tx = buildTx(market)
-
-  const newTx = getDecideTx(tx, decision, [sig1, sig2])
-
-  expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
-})
-
 // function getMinerSigs(minerPrivKeys: rabinPrivKey[], vote: number): rabinSig[] {
 //   return minerPrivKeys.map(privKey => {
 //     return getSignature(vote, privKey)
 //   })
 // }
+
+test("full market graph", () => {
+  const entries: entry[] = [
+    {
+      publicKey: privateKey.publicKey,
+      balance: {
+        liquidity: 1,
+        sharesFor: 0,
+        sharesAgainst: 0
+      }
+    }
+  ]
+
+  const market: marketInfo = {
+    details: { resolve: "test" },
+    status: { decided: false, decision: 0 },
+    miners,
+    balance: getMarketBalance(entries),
+    balanceMerkleRoot: getBalanceMerkleRoot(entries)
+  }
+
+  // Build init tx
+  const tx1 = buildTx(market)
+  fundTx(tx1, privateKey, address, utxos)
+
+  expect(isValidMarketTx(tx1, entries)).toBe(true)
+
+  // Add new entry
+  const newEntry: entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 0,
+      sharesFor: 2,
+      sharesAgainst: 0
+    }
+  }
+
+  const tx2 = getAddEntryTx(tx1, entries, newEntry)
+  fundTx(tx2, privateKey, address, utxos)
+
+  entries.push(newEntry)
+
+  expect(isValidMarketUpdateTx(tx2, tx1, entries)).toBe(true)
+
+  // Buy more shares
+  const newBalance: balance = {
+    liquidity: 1,
+    sharesFor: 0,
+    sharesAgainst: 1
+  }
+
+  const tx3 = getUpdateEntryTx(tx2, entries, newBalance, privateKey)
+  fundTx(tx3, privateKey, address, utxos)
+
+  entries[0].balance.sharesAgainst = 1
+
+  expect(isValidMarketUpdateTx(tx3, tx2, entries)).toBe(true)
+
+  // Sell shares
+  const newBalance2: balance = {
+    liquidity: 1,
+    sharesFor: 0,
+    sharesAgainst: 0
+  }
+
+  const tx4 = getUpdateEntryTx(tx3, entries, newBalance2, privateKey)
+  tx4.change(address)
+
+  entries[0].balance.sharesAgainst = 0
+
+  expect(isValidMarketUpdateTx(tx4, tx3, entries)).toBe(true)
+
+  // Decide market
+  const decision = 1
+  const sig1 = getSignature(decision, privKey1)
+  const sig2 = getSignature(decision, privKey2)
+
+  const tx5 = getDecideTx(tx4, decision, [sig1, sig2])
+  fundTx(tx5, privateKey, address, utxos)
+
+  expect(isValidMarketUpdateTx(tx5, tx4, entries)).toBe(true)
+
+  // Redeem balance
+  const tx6 = getRedeemTx(tx5, entries, privateKey)
+  tx6.change(address)
+
+  entries[0].balance.sharesFor = 0
+  entries[0].balance.sharesAgainst = 0
+
+  expect(isValidMarketUpdateTx(tx6, tx5, entries)).toBe(true)
+})

@@ -183,7 +183,13 @@ export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean 
   const hasValidSatBalance = getSatBalance(market.status, entries) <= balance
   const hasValidMarketBalance = market.status.decided ? true : validateEntries(market.balance, entries)
 
-  return tx.verify() === true && isValidMarketInfo(market) && hasValidMarketBalance && hasValidSatBalance
+  return (
+    tx.verify() === true &&
+    !tx.getSerializationError() &&
+    isValidMarketInfo(market) &&
+    hasValidMarketBalance &&
+    hasValidSatBalance
+  )
 }
 
 export function getAddEntryTx(prevTx: bsv.Transaction, prevEntries: entry[], entry: entry): bsv.Transaction {
@@ -257,7 +263,8 @@ export function getUpdateEntryTx(
   prevTx: bsv.Transaction,
   prevEntries: entry[],
   newBalance: balance,
-  privKey: bsv.PrivateKey
+  privKey: bsv.PrivateKey,
+  payoutAddress?: string
 ): bsv.Transaction {
   const publicKey = privKey.publicKey
   const entryIndex = prevEntries.findIndex(entry => entry.publicKey === publicKey)
@@ -317,6 +324,8 @@ export function getUpdateEntryTx(
     .toScript() as bsv.Script
 
   newTx.inputs[0].setScript(unlockingScript)
+  if (payoutAddress) newTx.change(payoutAddress)
+
   return newTx
 }
 
@@ -388,6 +397,8 @@ export function getRedeemTx(
     .toScript() as bsv.Script
 
   newTx.inputs[0].setScript(unlockingScript)
+  if (payoutAddress) newTx.change(payoutAddress)
+
   return newTx
 }
 
@@ -426,8 +437,13 @@ export function fundTx(
 ): bsv.Transaction {
   tx.change(changeAddress)
   tx.from(utxos)
-  tx.sign(privateKey)
-  // signTx(tx, privateKey, tx.outputs[0].script.toASM(), contractBalance, 1, sighashType)
+
+  const fundingInputs = tx.inputs.slice(1, tx.inputs.length)
+  fundingInputs.forEach((input: bsv.Transaction.Input, index: number) => {
+    const [signature] = input.getSignatures(tx, privateKey, index + 1)
+    if (!signature) throw new Error("Invalid privateKey")
+    input.addSignature(tx, signature)
+  })
 
   return tx
 }
