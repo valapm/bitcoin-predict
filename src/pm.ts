@@ -3,7 +3,7 @@ import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
 import { int2Hex, toHex, fromHex } from "./hex"
 import { isHash, hash, sha256 } from "./sha"
 import { minerDetail, getMinerDetailsHex, isValidMinerDetails } from "./oracle"
-import { MaxLiquidity, MaxShares } from "./lmsr"
+import { MaxLiquidity, MaxShares, getLmsrSats, SatScaling } from "./lmsr"
 import { ContractDescription, AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
 
@@ -241,4 +241,15 @@ export function validateEntries(balance: balance, entries: entry[]): boolean {
 
 export function isSameEntry(entry1: entry, entry2: entry): boolean {
   return entry1.publicKey.toString() === entry2.publicKey.toString()
+}
+
+export function getMarketSatBalance(status: marketStatus, entries: entry[]): number {
+  const isDecided = status.decided
+  const balance = getMarketBalance(entries)
+  if (isDecided) {
+    const shares = status.decision ? balance.sharesFor : balance.sharesAgainst
+    return shares * SatScaling
+  } else {
+    return getLmsrSats(balance)
+  }
 }

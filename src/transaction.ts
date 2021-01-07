@@ -20,7 +20,8 @@ import {
   getMerklePath,
   getEntryHex,
   getToken,
-  getBalanceMerkleRoot as getMerkleRoot
+  getBalanceMerkleRoot as getMerkleRoot,
+  getMarketSatBalance
 } from "./pm"
 import { minerDetail, getMinerDetailsFromHex, getMinerSigsString } from "./oracle"
 import { getLmsrSats, getLmsrShas, getLmsrMerklePath, lmsrScaled, SatScaling } from "./lmsr"
@@ -164,23 +165,12 @@ export function isValidMarketUpdateTx(tx: bsv.Transaction, prevTx: bsv.Transacti
   )
 }
 
-export function getSatBalance(status: marketStatus, entries: entry[]): number {
-  const isDecided = status.decided
-  const balance = getMarketBalance(entries)
-  if (isDecided) {
-    const shares = status.decision ? balance.sharesFor : balance.sharesAgainst
-    return shares * SatScaling
-  } else {
-    return getLmsrSats(balance)
-  }
-}
-
 export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean {
   const script = tx.outputs[0].script
   const balance = tx.outputs[0].satoshis
   const market = getMarketFromScript(script)
 
-  const hasValidSatBalance = getSatBalance(market.status, entries) <= balance
+  const hasValidSatBalance = getMarketSatBalance(market.status, entries) <= balance
   const hasValidMarketBalance = market.status.decided ? true : validateEntries(market.balance, entries)
 
   return (
@@ -435,12 +425,14 @@ export function fundTx(
   changeAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[]
 ): bsv.Transaction {
+  const inputAmount = tx.inputs.length
+
   tx.change(changeAddress)
   tx.from(utxos)
 
-  const fundingInputs = tx.inputs.slice(1, tx.inputs.length)
+  const fundingInputs = tx.inputs.slice(inputAmount, tx.inputs.length)
   fundingInputs.forEach((input: bsv.Transaction.Input, index: number) => {
-    const [signature] = input.getSignatures(tx, privateKey, index + 1)
+    const [signature] = input.getSignatures(tx, privateKey, index + inputAmount)
     if (!signature) throw new Error("Invalid privateKey")
     input.addSignature(tx, signature)
   })
