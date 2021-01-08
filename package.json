@@ -14,16 +14,12 @@
   "devDependencies": {
     "@tsconfig/node14": "^1.0.0",
     "@types/jest": "^26.0.19",
-    "@types/node": "^14.14.14",
-    "@types/lodash": "^4.14.165",
-    "@types/node-fetch": "^2.5.7",
     "@typescript-eslint/eslint-plugin": "^4.10.0",
     "@typescript-eslint/parser": "^4.10.0",
     "eslint": "^7.16.0",
     "eslint-config-prettier": "^6.15.0",
     "eslint-plugin-functional": "^3.1.0",
     "jest": "^26.5.3",
-    "lodash": "^4.17.20",
     "prettier": "^2.2.1",
     "ts-jest": "^26.4.1",
     "typescript": "^3.9.7"
@@ -32,8 +28,12 @@
     "lib/**/*"
   ],
   "dependencies": {
+    "@types/node": "^14.14.14",
+    "@types/lodash": "^4.14.165",
+    "@types/node-fetch": "^2.5.7",
     "node-fetch": "^2.6.1",
     "rabinsig": "git+https://github.com/sCrypt-Inc/rabin.git",
-    "scryptlib": "^0.2.25"
+    "scryptlib": "^0.2.25",
+    "lodash": "^4.17.20"
   }
 }

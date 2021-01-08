@@ -31,6 +31,7 @@ import { int2Hex } from "./hex"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinSig } from "rabinsig"
+import { cloneDeep } from "lodash"
 
 const feeb = 0.5
 
@@ -438,6 +439,70 @@ export function fundTx(
   })
 
   return tx
+}
+
+export function getIntFromOP(op: string): number {
+  const numString = op.startsWith("OP") ? op.slice(3) : op
+  return parseInt(numString)
+}
+
+export function getNewEntries(prevEntries: entry[], script: bsv.Script): entry[] {
+  const asm = script.toASM().split(" ")
+
+  const functionOp = getIntFromOP(asm[asm.length - 1])
+  // const functionPos = parseInt(functionOp.slice(3))
+  // const functionName = functionNames[functionPos]
+
+  if (functionOp === 0) {
+    // addEntry
+
+    const entry: entry = {
+      balance: {
+        liquidity: getIntFromOP(asm[1]),
+        sharesFor: getIntFromOP(asm[2]),
+        sharesAgainst: getIntFromOP(asm[3])
+      },
+      publicKey: bsv.PublicKey.fromHex(asm[4])
+    }
+
+    const newEntries = cloneDeep(prevEntries)
+    newEntries.push(entry)
+    return newEntries
+  } else if (functionOp === 1) {
+    // updateEntry
+
+    const publicKey = bsv.PublicKey.fromHex(asm[7])
+
+    const entry: entry = {
+      balance: {
+        liquidity: getIntFromOP(asm[1]),
+        sharesFor: getIntFromOP(asm[2]),
+        sharesAgainst: getIntFromOP(asm[3])
+      },
+      publicKey
+    }
+
+    const entryIndex = prevEntries.findIndex(entry => entry.publicKey === publicKey)
+
+    const newEntries = cloneDeep(prevEntries)
+    newEntries[entryIndex] = entry
+    return newEntries
+  } else if (functionOp === 2) {
+    // redeem
+
+    const publicKey = bsv.PublicKey.fromHex(asm[4])
+    const entryIndex = prevEntries.findIndex(entry => entry.publicKey === publicKey)
+
+    const entry = cloneDeep(prevEntries[entryIndex])
+    entry.balance.sharesFor = 0
+    entry.balance.sharesAgainst = 0
+
+    const newEntries = cloneDeep(prevEntries)
+    newEntries[entryIndex] = entry
+    return newEntries
+  } else {
+    return prevEntries
+  }
 }
 
 type market = {
