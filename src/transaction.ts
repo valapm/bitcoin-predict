@@ -446,6 +446,24 @@ export function getIntFromOP(op: string): number {
   return parseInt(numString)
 }
 
+export function getFunctionName(script: bsv.Script): string {
+  const asm = script.toASM().split(" ")
+
+  const functionOp = getIntFromOP(asm[asm.length - 1])
+
+  if (functionOp === 0) {
+    return "addEntry"
+  } else if (functionOp === 1) {
+    return "updateEntry"
+  } else if (functionOp === 2) {
+    return "redeem"
+  } else if (functionOp === 3) {
+    return "decide"
+  } else {
+    throw new Error("No known function")
+  }
+}
+
 export function getNewEntries(prevEntries: entry[], script: bsv.Script): entry[] {
   const asm = script.toASM().split(" ")
 
