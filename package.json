@@ -5,7 +5,8 @@
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/types/* lib",
+    "prepare": "npm run build",
     "format": "prettier --write \"src/**/*.ts\" \"src/**/*.js\"",
     "lint": "eslint src --ext .ts",
     "test": "jest"
@@ -28,12 +29,12 @@
     "lib/**/*"
   ],
   "dependencies": {
-    "@types/node": "^14.14.14",
     "@types/lodash": "^4.14.165",
+    "@types/node": "^14.14.14",
     "@types/node-fetch": "^2.5.7",
+    "lodash": "^4.17.20",
     "node-fetch": "^2.6.1",
     "rabinsig": "git+https://github.com/sCrypt-Inc/rabin.git",
-    "scryptlib": "^0.2.25",
-    "lodash": "^4.17.20"
+    "scryptlib": "^0.2.25"
   }
 }
