@@ -1,9 +1,9 @@
-import * as crypto from "crypto"
+import { bsv } from "scryptlib"
 
 export type hash = string
 
 export function sha256(x: string): string {
-  return crypto.createHash("sha256").update(Buffer.from(x, "hex")).digest("hex")
+  return bsv.crypto.Hash.sha256(Buffer.from(x, "hex")).toString("hex")
 }
 
 export function isHash(s: hash): s is hash {
