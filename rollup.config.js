@@ -2,10 +2,9 @@ import resolve from "@rollup/plugin-node-resolve"
 import commonjs from "@rollup/plugin-commonjs"
 import typescript from "@rollup/plugin-typescript"
 import nodePolyfills from "rollup-plugin-node-polyfills"
+// import alias from "@rollup/plugin-alias"
 import json from "@rollup/plugin-json"
 import pkg from "./package.json"
-
-import sucrase from "@rollup/plugin-sucrase"
 
 export default [
   // browser-friendly UMD build
@@ -19,24 +18,26 @@ export default [
       sourcemap: true
     },
     plugins: [
+      // alias({
+      //   elliptic: path.resolve(__dirname, "includes/elliptic.js")
+      // }),
       resolve({
         browser: true,
         preferBuiltins: true,
         extensions: [".js", ".ts"]
       }),
-      // sucrase({
-      //   exclude: ["node_modules/**"],
-      //   transforms: ["typescript"]
-      // }),
       typescript({
-        sourceMap: true,
-        module: "CommonJS"
+        sourceMap: true
+        // module: "CommonJS"
       }),
       commonjs({
         // include: "node_modules"
       }),
       json(),
-      nodePolyfills()
+      nodePolyfills({
+        // exclude: "node_modules/bsv"
+        // include: ["../node_modules/", "../scryptlib/**/*.js"]
+      })
     ]
   }
 
