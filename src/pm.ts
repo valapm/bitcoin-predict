@@ -8,6 +8,7 @@ import { ContractDescription, AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
 
 const identifier = "25c78e732e3af9aa593d1f71912775bcb2ada1bf"
+export const minerKeyPos = 8
 
 interface PM extends AbstractContract {
   addEntry(
@@ -77,7 +78,7 @@ export function getLockingScriptASMTemplate(): string[] {
 
 export function getLockingScriptASM(minerDetails: minerDetail[]): string[] {
   const asmTemplate = getLockingScriptASMTemplate()
-  asmTemplate[7] = getMinerDetailsHex(minerDetails)
+  asmTemplate[minerKeyPos] = getMinerDetailsHex(minerDetails)
   return asmTemplate
 }
 

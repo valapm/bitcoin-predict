@@ -1,5 +1,6 @@
 import { bsv, SigHashPreimage, PubKey, Bytes, toHex, Sig, getPreimage as getPreimageScrypt } from "scryptlib"
 import {
+  minerKeyPos,
   getMarketStatusHex,
   getMarketStatusfromHex,
   getMarketBalance,
@@ -77,7 +78,7 @@ export function getOpReturnData(script: bsv.Script): string[] {
 }
 
 export function getMinerDetails(script: bsv.Script): minerDetail[] {
-  const minerHex = script.toASM().split(" ")[7]
+  const minerHex = script.toASM().split(" ")[minerKeyPos]
   return getMinerDetailsFromHex(minerHex)
 }
 
