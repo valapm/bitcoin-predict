@@ -2,7 +2,7 @@ import resolve from "@rollup/plugin-node-resolve"
 import commonjs from "@rollup/plugin-commonjs"
 import typescript from "@rollup/plugin-typescript"
 import nodePolyfills from "rollup-plugin-node-polyfills"
-// import alias from "@rollup/plugin-alias"
+import alias from "@rollup/plugin-alias"
 import json from "@rollup/plugin-json"
 import pkg from "./package.json"
 
@@ -18,9 +18,9 @@ export default [
       sourcemap: true
     },
     plugins: [
-      // alias({
-      //   elliptic: path.resolve(__dirname, "includes/elliptic.js")
-      // }),
+      alias({
+        elliptic: path.resolve(__dirname, "includes/elliptic.js")
+      }),
       resolve({
         browser: true,
         preferBuiltins: true,

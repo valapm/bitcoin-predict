@@ -6,7 +6,9 @@
   "module": "dist/bitcoin-predict.esm.js",
   "browser": "dist/bitcoin-predict.umd.js",
   "scripts": {
-    "build": "rollup -c",
+    "build": "npm run build:elliptic && npm run build:rollup",
+    "build:elliptic": "webpack --config webpack.elliptic.js",
+    "build:rollup": "rollup -c",
     "dev": "rollup -c -w",
     "prepare": "npm run build",
     "format": "prettier --write \"src/**/*.ts\" \"src/**/*.js\"",
@@ -15,6 +17,7 @@
   },
   "author": "Merlin Buczek",
   "devDependencies": {
+    "@rollup/plugin-alias": "^3.1.2",
     "@rollup/plugin-commonjs": "^17.1.0",
     "@rollup/plugin-json": "^4.1.0",
     "@rollup/plugin-node-resolve": "^11.1.1",
@@ -31,7 +34,9 @@
     "rollup": "^2.38.4",
     "rollup-plugin-node-polyfills": "^0.2.1",
     "ts-jest": "^26.5.0",
-    "typescript": "^3.9.7"
+    "typescript": "^3.9.7",
+    "webpack": "^5.20.2",
+    "webpack-cli": "^4.5.0"
   },
   "files": [
     "dist",
