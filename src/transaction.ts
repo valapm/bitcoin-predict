@@ -32,7 +32,7 @@ import { int2Hex } from "./hex"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinSig } from "rabinsig"
-import { cloneDeep } from "lodash"
+import { cloneDeep } from "./utils"
 
 const feeb = 0.5
 
