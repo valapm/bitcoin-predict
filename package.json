@@ -6,8 +6,8 @@
   "types": "./lib/index.d.ts",
   "browser": "./dist/bitcoin-predict.js",
   "scripts": {
-    "build": "npm run build:browser && npm run build:node",
-    "build:browser": "webpack --config webpack.config.js",
+    "build": "npm run build:web && npm run build:node",
+    "build:web": "webpack --config webpack.config.js",
     "build:node": "tsc && cp src/types/* lib",
     "prepare": "npm run build",
     "format": "prettier --write \"src/**/*.ts\" \"src/**/*.js\"",

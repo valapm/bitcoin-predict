@@ -32,7 +32,8 @@ module.exports = {
   output: {
     filename: "bitcoin-predict.js",
     sourceMapFilename: "bitcoin-predict.map",
-    path: path.resolve(__dirname, "dist")
+    path: path.resolve(__dirname, "dist"),
+    libraryTarget: "umd"
   },
   plugins: [
     // new webpack.IgnorePlugin({ resourceRegExp: /child_process$/ }),
