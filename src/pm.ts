@@ -6,9 +6,10 @@ import { minerDetail, getMinerDetailsHex, isValidMinerDetails } from "./oracle"
 import { MaxLiquidity, MaxShares, getLmsrSats, SatScaling } from "./lmsr"
 import { ContractDescription, AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
+import { getOpReturnData } from "./transaction"
 
-const identifier = "25c78e732e3af9aa593d1f71912775bcb2ada1bf"
-export const minerKeyPos = 8
+const identifier = "6b8c5b603c5e3ac8e4fbd52647fa920fc4d91661"
+export const minerKeyPos = 8 // TODO: Implement compatibility for different contract versions
 
 interface PM extends AbstractContract {
   addEntry(
@@ -60,6 +61,12 @@ export type marketDetails = {
 export type marketStatus = {
   decided: boolean
   decision: number
+}
+
+export function getMinerKeyPos(script: bsv.Script): number {
+  const identifier = getOpReturnData(script)[0]
+  if (identifier === "25c78e732e3af9aa593d1f71912775bcb2ada1bf") return 7
+  return minerKeyPos
 }
 
 export function getCompiledPM(): void {

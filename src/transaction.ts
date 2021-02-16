@@ -1,6 +1,6 @@
 import { bsv, SigHashPreimage, PubKey, Bytes, toHex, Sig, getPreimage as getPreimageScrypt } from "scryptlib"
 import {
-  minerKeyPos,
+  getMinerKeyPos,
   getMarketStatusHex,
   getMarketStatusfromHex,
   getMarketBalance,
@@ -78,7 +78,8 @@ export function getOpReturnData(script: bsv.Script): string[] {
 }
 
 export function getMinerDetails(script: bsv.Script): minerDetail[] {
-  const minerHex = script.toASM().split(" ")[minerKeyPos]
+  const minerPos = getMinerKeyPos(script)
+  const minerHex = script.toASM().split(" ")[minerPos]
   return getMinerDetailsFromHex(minerHex)
 }
 
@@ -259,7 +260,7 @@ export function getUpdateEntryTx(
   payoutAddress?: string
 ): bsv.Transaction {
   const publicKey = privKey.publicKey
-  const entryIndex = prevEntries.findIndex(entry => entry.publicKey === publicKey)
+  const entryIndex = prevEntries.findIndex(entry => entry.publicKey.toString() === publicKey.toString())
 
   if (entryIndex === -1) throw new Error("No entry with this publicKey found.")
 
@@ -328,7 +329,7 @@ export function getRedeemTx(
   payoutAddress?: string
 ): bsv.Transaction {
   const publicKey = privKey.publicKey
-  const entryIndex = prevEntries.findIndex(entry => entry.publicKey === publicKey)
+  const entryIndex = prevEntries.findIndex(entry => entry.publicKey.toString() === publicKey.toString())
 
   if (entryIndex === -1) throw new Error("No entry with this publicKey found.")
 
@@ -501,7 +502,7 @@ export function getNewEntries(prevEntries: entry[], script: bsv.Script): entry[]
       publicKey
     }
 
-    const entryIndex = prevEntries.findIndex(entry => entry.publicKey === publicKey)
+    const entryIndex = prevEntries.findIndex(entry => entry.publicKey.toString() === publicKey.toString())
 
     const newEntries = cloneDeep(prevEntries)
     newEntries[entryIndex] = entry
@@ -510,7 +511,7 @@ export function getNewEntries(prevEntries: entry[], script: bsv.Script): entry[]
     // redeem
 
     const publicKey = bsv.PublicKey.fromHex(asm[4])
-    const entryIndex = prevEntries.findIndex(entry => entry.publicKey === publicKey)
+    const entryIndex = prevEntries.findIndex(entry => entry.publicKey.toString() === publicKey.toString())
 
     const entry = cloneDeep(prevEntries[entryIndex])
     entry.balance.sharesFor = 0
