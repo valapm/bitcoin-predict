@@ -15,6 +15,13 @@ export function lmsr(balance: balance): number {
   )
 }
 
+export function getProbability(balance: balance): number {
+  return (
+    Math.exp(balance.sharesFor / balance.liquidity) /
+    (Math.exp(balance.sharesFor / balance.liquidity) + Math.exp(balance.sharesAgainst / balance.liquidity))
+  )
+}
+
 export function lmsrScaled(balance: balance): number {
   return Math.round(lmsr(balance) * ScalingFactor)
 }
