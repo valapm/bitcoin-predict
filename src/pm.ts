@@ -8,7 +8,7 @@ import { ContractDescription, AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
 import { getOpReturnData } from "./transaction"
 
-const identifier = "6b8c5b603c5e3ac8e4fbd52647fa920fc4d91661"
+export const identifier = "6b8c5b603c5e3ac8e4fbd52647fa920fc4d91661"
 export const minerKeyPos = 8 // TODO: Implement compatibility for different contract versions
 
 interface PM extends AbstractContract {
