@@ -1,7 +1,6 @@
-import { getLmsrShas, getPos, getLmsrHex } from "../src/lmsr"
+import { getLmsrShas, getPos, getLmsrHex, balance } from "../src/lmsr"
 import { getMerklePath, verifyLeaf, getMerkleRoot } from "../src/merkleTree"
 import { sha256 } from "../src/sha"
-import { balance } from "../src/pm"
 
 test("generate and verify lmsr hashes", () => {
   const prevBalance: balance = {

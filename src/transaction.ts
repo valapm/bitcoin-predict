@@ -1,23 +1,18 @@
-import { bsv, SigHashPreimage, PubKey, Bytes, toHex, Sig, getPreimage as getPreimageScrypt } from "scryptlib"
+import { bsv, SigHashPreimage, PubKey, Bytes, Sig } from "scryptlib"
 import {
-  getMinerKeyPos,
-  getMarketStatusHex,
+  getMarketVersion,
   getMarketStatusfromHex,
   getMarketBalance,
-  getMarketBalanceHex,
-  balance,
   marketDetails,
   entry,
   marketStatus,
   getBalanceFromHex,
-  getMarketDetailsHex,
   getMarketDetailsFromHex,
   isValidMarketInfo,
   validateEntries,
   marketInfo,
   marketStatusHexLength,
   balanceHexLength,
-  getBalanceHex,
   getMerklePath,
   getEntryHex,
   getToken,
@@ -25,10 +20,9 @@ import {
   getMarketSatBalance
 } from "./pm"
 import { minerDetail, getMinerDetailsFromHex, getMinerSigsString } from "./oracle"
-import { getLmsrSats, getLmsrShas, getLmsrMerklePath, lmsrScaled, SatScaling } from "./lmsr"
+import { getLmsrSats, getLmsrShas, getLmsrMerklePath, lmsrScaled, SatScaling, balance } from "./lmsr"
 import { hash } from "./sha"
 import { getMerkleRootByPath } from "./merkleTree"
-import { int2Hex } from "./hex"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinSig } from "rabinsig"
@@ -78,8 +72,9 @@ export function getOpReturnData(script: bsv.Script): string[] {
 }
 
 export function getMinerDetails(script: bsv.Script): minerDetail[] {
-  const minerPos = getMinerKeyPos(script)
-  const minerHex = script.toASM().split(" ")[minerPos]
+  const data = getOpReturnData(script)
+  const version = getMarketVersion(data[0])
+  const minerHex = script.toASM().split(" ")[version.minerKeyPos]
   return getMinerDetailsFromHex(minerHex)
 }
 
@@ -150,6 +145,7 @@ export function getPreimage(prevTx: bsv.Transaction, newTx: bsv.Transaction): Bu
 export function getMarketFromScript(script: bsv.Script): marketInfo {
   const data = getOpReturnData(script)
   return {
+    version: data[0],
     details: getMarketDetails(data),
     status: getMarketStatus(data),
     miners: getMinerDetails(script),
@@ -431,9 +427,14 @@ export function fundTx(
   const inputAmount = tx.inputs.length
 
   tx.change(changeAddress)
+
   tx.from(utxos)
 
   const fundingInputs = tx.inputs.slice(inputAmount, tx.inputs.length)
+
+  // Check amount
+  if (tx.inputAmount < tx.outputAmount) throw new Error(`Input amount needs to be at least ${tx.outputAmount}`)
+
   fundingInputs.forEach((input: bsv.Transaction.Input, index: number) => {
     const [signature] = input.getSignatures(tx, privateKey, index + inputAmount)
     if (!signature) throw new Error("Invalid privateKey")
@@ -485,7 +486,7 @@ export function getNewEntries(prevEntries: entry[], script: bsv.Script): entry[]
       publicKey: bsv.PublicKey.fromHex(asm[4])
     }
 
-    const newEntries = cloneDeep(prevEntries)
+    const newEntries = cloneDeep(prevEntries) as entry[]
     newEntries.push(entry)
     return newEntries
   } else if (functionOp === 1) {
@@ -504,7 +505,7 @@ export function getNewEntries(prevEntries: entry[], script: bsv.Script): entry[]
 
     const entryIndex = prevEntries.findIndex(entry => entry.publicKey.toString() === publicKey.toString())
 
-    const newEntries = cloneDeep(prevEntries)
+    const newEntries = cloneDeep(prevEntries) as entry[]
     newEntries[entryIndex] = entry
     return newEntries
   } else if (functionOp === 2) {
@@ -513,19 +514,14 @@ export function getNewEntries(prevEntries: entry[], script: bsv.Script): entry[]
     const publicKey = bsv.PublicKey.fromHex(asm[4])
     const entryIndex = prevEntries.findIndex(entry => entry.publicKey.toString() === publicKey.toString())
 
-    const entry = cloneDeep(prevEntries[entryIndex])
+    const entry = cloneDeep(prevEntries[entryIndex]) as entry
     entry.balance.sharesFor = 0
     entry.balance.sharesAgainst = 0
 
-    const newEntries = cloneDeep(prevEntries)
+    const newEntries = cloneDeep(prevEntries) as entry[]
     newEntries[entryIndex] = entry
     return newEntries
   } else {
     return prevEntries
   }
-}
-
-type market = {
-  headTx: bsv.Transaction
-  entries: entry[]
 }

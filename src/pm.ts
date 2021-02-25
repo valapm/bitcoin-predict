@@ -3,13 +3,16 @@ import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
 import { int2Hex, toHex, fromHex } from "./hex"
 import { isHash, hash, sha256 } from "./sha"
 import { minerDetail, getMinerDetailsHex, isValidMinerDetails } from "./oracle"
-import { MaxLiquidity, MaxShares, getLmsrSats, SatScaling } from "./lmsr"
+import { MaxLiquidity, MaxShares, getLmsrSats, SatScaling, balance } from "./lmsr"
 import { ContractDescription, AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
-import { getOpReturnData } from "./transaction"
 
-export const identifier = "6b8c5b603c5e3ac8e4fbd52647fa920fc4d91661"
-export const minerKeyPos = 8 // TODO: Implement compatibility for different contract versions
+export type version = {
+  identifier: string
+  minerKeyPos: number
+}
+
+export const versions: version[] = [{ identifier: "6b8c5b603c5e3ac8e4fbd52647fa920fc4d91661", minerKeyPos: 8 }]
 
 interface PM extends AbstractContract {
   addEntry(
@@ -63,30 +66,32 @@ export type marketStatus = {
   decision: number
 }
 
-export function getMinerKeyPos(script: bsv.Script): number {
-  const identifier = getOpReturnData(script)[0]
-  if (identifier === "25c78e732e3af9aa593d1f71912775bcb2ada1bf") return 7
-  return minerKeyPos
-}
-
-export function getCompiledPM(): void {
-  const contractPath = require.resolve("scrypt_boilerplate/contracts/predictionMarket.scrypt")
-  compile({ path: contractPath }, { desc: true })
-}
+// export function getCompiledPM(): void {
+//   const contractPath = require.resolve("scrypt_boilerplate/contracts/predictionMarket.scrypt")
+//   compile({ path: contractPath }, { desc: true })
+// }
 
 // export function getContractDescription(): ContractDescription {
 //   return require("../predictionMarket.json") as ContractDescription
 // }
 
-export function getLockingScriptASMTemplate(): string[] {
-  const compiled = require("../predictionMarket.json") as ContractDescription
-  return compiled.asm.split(" ")
-}
+// export function getLockingScriptASMTemplate(): string[] {
+//   const currentVersion = versions[0]
+//   const compiled = require(`../scripts/${currentVersion.identifier}`) as ContractDescription
+//   return compiled.asm.split(" ")
+// }
 
-export function getLockingScriptASM(minerDetails: minerDetail[]): string[] {
-  const asmTemplate = getLockingScriptASMTemplate()
-  asmTemplate[minerKeyPos] = getMinerDetailsHex(minerDetails)
-  return asmTemplate
+// export function getLockingScriptASM(minerDetails: minerDetail[]): string[] {
+//   const asmTemplate = getLockingScriptASMTemplate()
+//   const minerKeyPos = asmTemplate.findIndex(op => op === "$minerKeys")
+//   asmTemplate[minerKeyPos] = getMinerDetailsHex(minerDetails)
+//   return asmTemplate
+// }
+
+export function getMarketVersion(identifier: string): version {
+  const version = versions.find(version => version.identifier === identifier)
+  if (!version) throw new Error("Market version not supported")
+  return version
 }
 
 // export function getToken(miners: minerDetail): Token {
@@ -94,23 +99,28 @@ export function getLockingScriptASM(minerDetails: minerDetail[]): string[] {
 //   return new Token(getMinerDetailsHex(miners))
 // }
 
+export function getNewMarket(details: marketDetails, entries: entry[], miners: minerDetail[]): marketInfo {
+  return {
+    version: versions[0].identifier,
+    details,
+    status: { decided: false, decision: 0 },
+    miners,
+    balance: getMarketBalance(entries),
+    balanceMerkleRoot: getBalanceMerkleRoot(entries)
+  }
+}
+
 export function getToken(market: marketInfo): PM {
-  const Token = buildContractClass(require("../predictionMarket.json"))
+  const Token = buildContractClass(require(`../scripts/${market.version}.json`))
   const token = new Token(new Bytes(getMinerDetailsHex(market.miners))) as PM
 
   const marketBalanceHex = getBalanceHex(market.balance) + String(market.balanceMerkleRoot)
   const marketDetailsHex = getMarketDetailsHex(market.details)
   const marketStatusHex = getMarketStatusHex(market.status)
 
-  token.setDataPart(`${identifier} ${marketDetailsHex} ${marketStatusHex + marketBalanceHex}`)
+  token.setDataPart(`${market.version} ${marketDetailsHex} ${marketStatusHex + marketBalanceHex}`)
 
   return token
-}
-
-export type balance = {
-  liquidity: number
-  sharesFor: number
-  sharesAgainst: number
 }
 
 export type entry = {
@@ -119,6 +129,7 @@ export type entry = {
 }
 
 export type marketInfo = {
+  version: string
   status: marketStatus
   details: marketDetails
   balance: balance

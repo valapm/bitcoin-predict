@@ -9,7 +9,8 @@ import {
   isValidMarketUpdateTx
 } from "../src/transaction"
 import { privKeyToPubKey, rabinPrivKey } from "rabinsig"
-import { entry, getMarketBalance, getBalanceMerkleRoot, balance, marketInfo } from "../src/pm"
+import { entry, getMarketBalance, getBalanceMerkleRoot, marketInfo, getNewMarket } from "../src/pm"
+import { balance } from "../src/lmsr"
 import { bsv } from "scryptlib"
 import { getSignature } from "../src/oracle"
 import { cloneDeep } from "lodash"
@@ -70,13 +71,7 @@ const utxoData = [
 
 const utxos = utxoData.map(utxo => bsv.Transaction.UnspentOutput.fromObject(utxo))
 
-const market: marketInfo = {
-  details: { resolve: "test" },
-  status: { decided: false, decision: 0 },
-  miners,
-  balance: getMarketBalance(entries),
-  balanceMerkleRoot: getBalanceMerkleRoot(entries)
-}
+const market = getNewMarket({ resolve: "test" }, entries, miners)
 
 test("build and fund pm init transaction", () => {
   const tx = buildTx(market)
@@ -210,13 +205,7 @@ test("full market graph", () => {
     }
   ]
 
-  const market: marketInfo = {
-    details: { resolve: "test" },
-    status: { decided: false, decision: 0 },
-    miners,
-    balance: getMarketBalance(entries),
-    balanceMerkleRoot: getBalanceMerkleRoot(entries)
-  }
+  const market = getNewMarket({ resolve: "test" }, entries, miners)
 
   // Build init tx
   const tx1 = buildTx(market)

@@ -1,12 +1,17 @@
 import { sha256, hash } from "./sha"
 import { int2Hex } from "./hex"
-import { balance } from "./pm"
 import { getMerklePath } from "./merkleTree"
 
 export const MaxShares = 2 ** 7
 export const MaxLiquidity = 2 ** 2
 export const ScalingFactor = 2 ** 35
 export const SatScaling = 2 ** 20
+
+export type balance = {
+  liquidity: number
+  sharesFor: number
+  sharesAgainst: number
+}
 
 export function lmsr(balance: balance): number {
   return (

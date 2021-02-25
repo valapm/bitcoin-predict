@@ -6,5 +6,6 @@ import * as hex from "./hex"
 import * as oracle from "./oracle"
 import * as sha from "./sha"
 import { bsv } from "scryptlib"
+import * as rabin from "rabinsig"
 
-export { bsv, transaction, pm, lmsr, merkleTree, hex, oracle, sha }
+export { bsv, rabin, transaction, pm, lmsr, merkleTree, hex, oracle, sha }
