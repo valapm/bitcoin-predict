@@ -5,7 +5,7 @@ import { num2bin } from "scryptlib"
 
 export type minerDetail = { pubKey: rabinPubKey; votes: number }
 
-export const rabinKeyLength = 125
+export const rabinKeyLength = 126
 
 export function getTotalVotes(minerDetails: minerDetail[]): number {
   return minerDetails.reduce((votes: number, miner: minerDetail) => votes + miner.votes, 0)

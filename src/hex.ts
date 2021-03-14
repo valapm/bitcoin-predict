@@ -1,4 +1,6 @@
 export function reverseHex(s: string): string {
+  s = s.length % 2 ? "0" + s : s
+
   const array = []
   for (let i = 0; i <= s.length - 2; i++) {
     if (i % 2 === 0) array.push(s.substring(i, i + 2))
