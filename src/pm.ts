@@ -12,7 +12,10 @@ export type version = {
   minerKeyPos: number
 }
 
-export const versions: version[] = [{ identifier: "6b8c5b603c5e3ac8e4fbd52647fa920fc4d91661", minerKeyPos: 8 }]
+export const versions: version[] = [
+  { identifier: "8405e83ea9586904ac569d02d32bc9bb", minerKeyPos: 8 },
+  { identifier: "6b8c5b603c5e3ac8e4fbd52647fa920fc4d91661", minerKeyPos: 8 }
+]
 
 interface PM extends AbstractContract {
   addEntry(
