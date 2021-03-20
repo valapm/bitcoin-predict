@@ -1,5 +1,8 @@
-import { getMinerDetailsHex, getMinerDetailsFromHex, minerDetail } from "../src/oracle"
+import { getMinerDetailsHex, getMinerDetailsFromHex, minerDetail, getSignature } from "../src/oracle"
 import { generatePrivKey, privKeyToPubKey } from "rabinsig"
+import { int2Hex } from "../src/hex"
+
+const { verify } = require("rabinsig") // Why doesn't import work for verify ???
 
 const privKey1 = generatePrivKey()
 const privKey2 = generatePrivKey()
@@ -21,4 +24,13 @@ test("should accurately convert to and from minerDetails", () => {
 
   expect(test).toEqual(minerDetails)
   expect(getMinerDetailsFromHex(hex)).toEqual(minerDetails)
+})
+
+test("should produce valid signature", () => {
+  const decision = 1
+  const signature = getSignature(decision, privKey1)
+
+  const messageHex = int2Hex(decision)
+
+  expect(verify(messageHex, signature.paddingByteCount, signature.signature, pubKey1)).toBe(true)
 })

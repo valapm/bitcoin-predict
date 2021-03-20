@@ -13,7 +13,7 @@ export type version = {
 }
 
 export const versions: version[] = [
-  { identifier: "8405e83ea9586904ac569d02d32bc9bb", minerKeyPos: 8 },
+  { identifier: "a9e31c2f9b000e9b903d8cacd1c8c995", minerKeyPos: 11 },
   { identifier: "6b8c5b603c5e3ac8e4fbd52647fa920fc4d91661", minerKeyPos: 8 }
 ]
 
