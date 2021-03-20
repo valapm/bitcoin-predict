@@ -46,7 +46,7 @@
     "@types/node": "^14.14.25",
     "@types/node-fetch": "^2.5.8",
     "node-fetch": "^2.6.1",
-    "rabinsig": "git+https://github.com/sCrypt-Inc/rabin.git",
+    "rabinsig": "git+https://github.com/MerlinB/rabin.git",
     "scryptlib": "^0.2.31"
   }
 }
