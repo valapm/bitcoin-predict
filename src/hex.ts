@@ -18,6 +18,14 @@ export function int2Hex(num: number | bigint, byteSize?: number): string {
   return reverseHex(hex)
 }
 
+export function bool2Hex(bool: boolean): string {
+  return bool ? "01" : "00"
+}
+
+export function hex2Bool(hex: string): boolean {
+  return hex === "00" ? false : true
+}
+
 export function toHex(s: string): string {
   return s
     .split("")
@@ -33,4 +41,15 @@ export function fromHex(s: string): string {
 
 export function hex2BigInt(hex: string): bigint {
   return BigInt("0x" + reverseHex(hex))
+}
+
+export function hex2IntArray(hex: string, bytes = 1): number[] {
+  return hex
+    .split("")
+    .reduce((shares: string[], n, i) => (!(i % bytes) ? shares.concat([hex.slice(i, i + bytes)]) : shares), [])
+    .map(parseInt)
+}
+
+export function splitHexByNumber(hex: string, length: number): string[] {
+  return hex.match(new RegExp(".{1," + length.toString() + "}", "g")) || [] // eslint-disable-line
 }

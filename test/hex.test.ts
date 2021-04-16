@@ -1,4 +1,4 @@
-import { int2Hex, hex2BigInt, fromHex, toHex } from "../src/hex"
+import { int2Hex, hex2BigInt, fromHex, toHex, hex2IntArray } from "../src/hex"
 
 test("int2hex", () => {
   expect(
@@ -24,4 +24,10 @@ test("convert from and to hex", () => {
   const string = "abcdefg123"
   const hex = toHex(string)
   expect(fromHex(hex)).toBe(string)
+})
+
+test("hex2IntArray", () => {
+  const numbers = [1, 2, 3, 4, 5]
+  const hex = numbers.map(int2Hex).join("")
+  expect(hex2IntArray(hex)).toBe(numbers)
 })

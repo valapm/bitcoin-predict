@@ -473,7 +473,13 @@ declare module "bsv" {
     readonly network: Networks.Network
     readonly type: string
 
+    static fromString(hex: string): Address
+    static fromHex(hex: string): Address
+
     constructor(data: Buffer | Uint8Array | string | object, network?: Networks.Network | string, type?: string)
+
+    toString(): string
+    toHex(): string
   }
 
   export class Unit {

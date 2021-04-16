@@ -1,61 +1,89 @@
 import { privKeyToPubKey, sign, rabinSig, rabinPrivKey, rabinPubKey } from "rabinsig"
 
-import { int2Hex, hex2BigInt } from "./hex"
+import { int2Hex, hex2BigInt, hex2Bool, bool2Hex, splitHexByNumber } from "./hex"
 import { num2bin } from "scryptlib"
 
-export type minerDetail = { pubKey: rabinPubKey; votes: number }
+export type oracleDetail = { pubKey: rabinPubKey; votes: number; committed?: boolean; voted?: boolean }
+// export type oracleState = {}
 
-export const rabinKeyLength = 126
+export const rabinKeyByteLength = 126
+export const oracleInfoByteLength = rabinKeyByteLength + 1
+export const oracleStateByteLength = 2
 
-export function getTotalVotes(minerDetails: minerDetail[]): number {
-  return minerDetails.reduce((votes: number, miner: minerDetail) => votes + miner.votes, 0)
+export function getTotalVotes(oracleDetails: oracleDetail[]): number {
+  return oracleDetails.reduce((votes: number, oracle: oracleDetail) => votes + oracle.votes, 0)
 }
 
-export function isValidMinerDetails(minerDetails: minerDetail[]): minerDetails is minerDetail[] {
-  return getTotalVotes(minerDetails) === 100
+export function isValidOracleDetails(oracleDetails: oracleDetail[]): oracleDetails is oracleDetail[] {
+  return getTotalVotes(oracleDetails) === 100
 }
 
-export function getMinerDetailHex(minerDetail: minerDetail): string {
-  return int2Hex(minerDetail.pubKey, rabinKeyLength) + num2bin(minerDetail.votes, 1)
+export function getOracleDetailHex(oracleDetail: oracleDetail): string {
+  return int2Hex(oracleDetail.pubKey, rabinKeyByteLength) + num2bin(oracleDetail.votes, 1)
 }
 
-export function getMinerDetailsHex(minerDetails: minerDetail[]): string {
-  return minerDetails.map(getMinerDetailHex).join("")
+export function getOracleDetailsHex(oracleDetails: oracleDetail[]): string {
+  return oracleDetails.map(getOracleDetailHex).join("")
 }
 
-export function getMinerDetailFromHex(hex: string): minerDetail {
+export function getOracleStateHex(oracleDetail: oracleDetail): string {
+  return bool2Hex(oracleDetail.committed || false) + bool2Hex(oracleDetail.voted || false)
+}
+
+export function getOracleStatesHex(oracleDetails: oracleDetail[]): string {
+  return oracleDetails.map(getOracleStateHex).join("")
+}
+
+function getOraclePubKeyFromHex(hex: string): bigint {
   const pubKeyHex = hex.slice(0, hex.length - 2)
+  return hex2BigInt(pubKeyHex)
+}
+
+function getOracleVotesFromHex(hex: string): number {
   const votesHex = hex.slice(hex.length - 2, hex.length)
-  return {
-    pubKey: hex2BigInt(pubKeyHex),
-    votes: parseInt(votesHex, 16)
-  }
+  return parseInt(votesHex, 16)
 }
 
-export function getMinerDetailsFromHex(hex: string): minerDetail[] {
-  const minerDetails = hex.match(new RegExp(".{1," + (rabinKeyLength * 2 + 2).toString() + "}", "g"))
-  return minerDetails ? minerDetails.map(getMinerDetailFromHex) : []
+export function getOracleDetailsFromHex(oracleKeysHex: string, oracleStatesHex: string): oracleDetail[] {
+  const oracleHexLength = rabinKeyByteLength * 2 + 2
+  const oracles = splitHexByNumber(oracleKeysHex, oracleHexLength)
+
+  const oracleStateLength = oracleStateByteLength * 2
+  const oracleStates = splitHexByNumber(oracleStatesHex, oracleStateLength)
+
+  const oracleDetails = oracles.map((oracleHex, i) => {
+    const stateHex = oracleStates[i]
+
+    return {
+      pubKey: getOraclePubKeyFromHex(oracleHex),
+      votes: getOracleVotesFromHex(oracleHex),
+      committed: hex2Bool(stateHex.slice(0, 2)),
+      voted: hex2Bool(stateHex.slice(2, 4))
+    }
+  })
+
+  return oracleDetails
 }
 
-export function getMinerSigHex(signature: rabinSig, keyPos: number): string {
+export function getOracleSigHex(signature: rabinSig, keyPos: number): string {
   return [
     num2bin(keyPos, 1),
-    int2Hex(signature.signature, rabinKeyLength),
+    int2Hex(signature.signature, rabinKeyByteLength),
     num2bin(signature.paddingByteCount, 1)
   ].join("")
 }
 
-export function getMinerSigsString(minerSigs: rabinSig[]): string {
-  return minerSigs.map(getMinerSigHex).join("")
+export function getOracleSigsString(oracleSigs: rabinSig[]): string {
+  return oracleSigs.map(getOracleSigHex).join("")
 }
 
 /**
- * Generates a valid decision signature. Intended for miner and testing usage.
+ * Generates a valid decision signature. Intended for oracle and testing usage.
  *
  * @param message Should be 0 or 1
  * @param privKey
  */
-export function getSignature(message: number, privKey: rabinPrivKey): rabinSig {
+export function getSignature(message: string, privKey: rabinPrivKey): rabinSig {
   const pubKey = privKeyToPubKey(privKey.p, privKey.q)
-  return sign(num2bin(message, 1), privKey.p, privKey.q, pubKey)
+  return sign(message, privKey.p, privKey.q, pubKey)
 }

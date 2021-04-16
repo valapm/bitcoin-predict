@@ -26,6 +26,6 @@ export async function fetchUTXOs(address: string, apiKey: string): Promise<bsv.T
   return utxos
 }
 
-// export async function fetchMinerDetails(): Promise<minerDetail[]> {
+// export async function fetchOracleDetails(): Promise<oracleDetail[]> {
 //   // TODO: Implement
 // }

@@ -1,6 +1,6 @@
 /**
  * These implementations mirror the Bitcoin Script based implementations used.
- * They are necessary to ensure that we produce the same results as the miners.
+ * They are necessary to ensure that we produce the same results as the oracles.
  */
 
 export const precision = 16
