@@ -1,6 +1,11 @@
-import { getMinerDetailsHex, getMinerDetailsFromHex, minerDetail, getSignature } from "../src/oracle"
+import {
+  getOracleDetailsHex,
+  getOracleDetailsFromHex,
+  oracleDetail,
+  getSignature,
+  getOracleStatesHex
+} from "../src/oracle"
 import { generatePrivKey, privKeyToPubKey } from "rabinsig"
-import { int2Hex } from "../src/hex"
 
 const { verify } = require("rabinsig") // Why doesn't import work for verify ???
 
@@ -10,27 +15,29 @@ const privKey2 = generatePrivKey()
 const pubKey1 = privKeyToPubKey(privKey1.p, privKey1.q)
 const pubKey2 = privKeyToPubKey(privKey2.p, privKey2.q)
 
-const minerDetails: minerDetail[] = [
-  { pubKey: pubKey1, votes: 40 },
+const oracleDetails: oracleDetail[] = [
+  { pubKey: pubKey1, votes: 40, committed: false, voted: false },
   {
     pubKey: pubKey2,
-    votes: 60
+    votes: 60,
+    committed: true,
+    voted: true
   }
 ]
 
-test("should accurately convert to and from minerDetails", () => {
-  const hex = getMinerDetailsHex(minerDetails)
-  const test = getMinerDetailsFromHex(hex)
+test("should accurately convert to and from oracleDetails", () => {
+  const deatilsHex = getOracleDetailsHex(oracleDetails)
+  const stateHex = getOracleStatesHex(oracleDetails)
+  const test = getOracleDetailsFromHex(deatilsHex, stateHex)
 
-  expect(test).toEqual(minerDetails)
-  expect(getMinerDetailsFromHex(hex)).toEqual(minerDetails)
+  expect(test).toEqual(oracleDetails)
 })
 
 test("should produce valid signature", () => {
-  const decision = 1
-  const signature = getSignature(decision, privKey1)
+  const sigContent = "Some Signature Content"
+  const contentHex = Buffer.from(sigContent, "utf-8").toString("hex")
 
-  const messageHex = int2Hex(decision)
+  const signature = getSignature(contentHex, privKey1)
 
-  expect(verify(messageHex, signature.paddingByteCount, signature.signature, pubKey1)).toBe(true)
+  expect(verify(contentHex, signature.paddingByteCount, signature.signature, pubKey1)).toBe(true)
 })

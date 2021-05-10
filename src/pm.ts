@@ -22,13 +22,13 @@ export type version = {
 // Keep track of old versions for compatibility.
 export const versions: version[] = [
   {
-    identifier: "7331015cf388eb84911d06c54af70202",
-    oracleKeyPos: 24,
-    globalOptionCountPos: 25,
-    requiredVotesPos: 26,
-    creatorPubKeyPos: 27,
-    creatorPayoutAddressPos: 28,
-    creatorFeePos: 29,
+    identifier: "f1b59d4a10014958b5123b1d795e2514",
+    oracleKeyPos: 26,
+    globalOptionCountPos: 27,
+    requiredVotesPos: 28,
+    creatorPubKeyPos: 29,
+    creatorPayoutAddressPos: 30,
+    creatorFeePos: 31,
     maxOptionCount: 6,
     maxOracleCount: 3
   }
@@ -48,7 +48,7 @@ interface PM extends AbstractContract {
     signature: Sig,
     merklePath: Bytes,
     oraclePos: number,
-    oracleSig: number,
+    oracleSig: BigInt,
     paddingCount: number,
     oracleDecision: number
   ): FunctionCall
@@ -58,8 +58,10 @@ interface PM extends AbstractContract {
 
 export type marketDetails = {
   resolve: string
-  details: string
-  options: string[]
+  details: string // Detailed Information about the market
+  options: {
+    length: number // globalOptionCount
+  }
 }
 
 export type marketStatus = {
@@ -94,8 +96,8 @@ export const voteCountByteLen = 2
 
 export const marketStatusHexLength = 4
 
-export const entryLiqudityPos = 32
-export const entrySharePos = 33
+export const entryLiqudityPos = 33
+export const entrySharePos = 34
 
 // export function getCompiledPM(): void {
 //   const contractPath = require.resolve("scrypt_boilerplate/contracts/predictionMarket.scrypt")
@@ -137,7 +139,10 @@ export function getNewMarket(
   creator: creatorInfo,
   creatorFee: number
 ): marketInfo {
-  const votes = "0".repeat(details.options.length).split("").map(parseInt)
+  const votes = "0"
+    .repeat(details.options.length)
+    .split("")
+    .map(n => parseInt(n))
 
   return {
     version: versions[0].identifier,
@@ -153,26 +158,43 @@ export function getNewMarket(
 
 export function getToken(market: marketInfo): PM {
   const Token = buildContractClass(require(`../scripts/${market.version}.json`)) // eslint-disable-line
+
   const token = new Token( // eslint-disable-line
     new Bytes(getOracleDetailsHex(market.oracles)), // oracleKeys
     market.details.options.length, // globalOptionCount
     1, // requiredVotes,
-    new PubKey(market.creator.pubKey.toString()),
-    new Ripemd160(market.creator.payoutAddress.toString()),
+    new PubKey(market.creator.pubKey.toHex()),
+    new Ripemd160(market.creator.payoutAddress.toHex()),
     market.creatorFee
   ) as PM
+
+  // console.log([
+  //   new Bytes(getOracleDetailsHex(market.oracles)).toLiteral(), // oracleKeys
+  //   market.details.options.length, // globalOptionCount
+  //   1, // requiredVotes,
+  //   new PubKey(market.creator.pubKey.toHex()).toLiteral(),
+  //   new Ripemd160(market.creator.payoutAddress.toHex()).toLiteral(),
+  //   market.creatorFee
+  // ])
 
   const marketDetailsHex = getMarketDetailsHex(market.details)
   const oracleStatesHex = getOracleStatesHex(market.oracles)
   const marketStatusHex = getMarketStatusHex(market.status)
   const marketBalanceHex = getBalanceHex(market.balance)
   const marketBalanceMerkleRoot = String(market.balanceMerkleRoot)
+  const marketVotesHex = getVotesHex(market.status.votes)
 
-  const marketDataHex = marketStatusHex + oracleStatesHex + marketBalanceHex + marketBalanceMerkleRoot
+  const marketDataHex = marketStatusHex + oracleStatesHex + marketVotesHex + marketBalanceHex + marketBalanceMerkleRoot
 
   token.setDataPart(`${market.version} ${marketDetailsHex} ${marketDataHex}`)
 
+  // console.log(`${market.version} ${marketDetailsHex} ${marketDataHex}`)
+
   return token
+}
+
+export function getVotesHex(votes: number[]): string {
+  return votes.map(vote => int2Hex(vote, 2)).join("")
 }
 
 export function getEntryHex(entry: entry): string {
@@ -231,7 +253,7 @@ export function getMarketStatusfromHex(decisionHex: string, votesHex: string): m
   return {
     decided: Boolean(parseInt(decisionHex.slice(0, 2), 16)),
     decision: parseInt(decisionHex.slice(2, 4), 16),
-    votes: splitHexByNumber(votesHex, 2).map(parseInt)
+    votes: splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => parseInt(n))
   }
 }
 

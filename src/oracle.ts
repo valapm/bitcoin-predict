@@ -10,6 +10,9 @@ export const rabinKeyByteLength = 126
 export const oracleInfoByteLength = rabinKeyByteLength + 1
 export const oracleStateByteLength = 2
 
+// Hash of oracleCommitment.txt
+export const commitmentHash = "0E47D25DE560350A3717647DD69C4B5E190A46484589A20435CE79CE002E07DB"
+
 export function getTotalVotes(oracleDetails: oracleDetail[]): number {
   return oracleDetails.reduce((votes: number, oracle: oracleDetail) => votes + oracle.votes, 0)
 }

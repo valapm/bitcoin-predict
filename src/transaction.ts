@@ -1,43 +1,35 @@
-import { bsv, SigHashPreimage, PubKey, Bytes, Sig, Ripemd160 } from "scryptlib"
+import { bsv, SigHashPreimage, Bytes, Sig, Ripemd160 } from "scryptlib"
 import {
   getMarketVersion,
   getMarketStatusfromHex,
   getMarketBalance,
-  marketDetails,
   entry,
-  marketStatus,
-  getBalanceFromHex,
   getMarketDetailsFromHex,
   isValidMarketInfo,
   validateEntries,
   marketInfo,
-  marketStatusHexLength,
-  getBalanceHexLength,
   getMerklePath,
   getEntryHex,
   getToken,
   getBalanceMerkleRoot as getMerkleRoot,
   getMinMarketSatBalance,
-  versions,
   voteCountByteLen,
   balanceTableByteLength,
   getSharesHex
 } from "./pm"
 import {
-  oracleDetail,
   getOracleDetailsFromHex,
-  getOracleSigsString,
   oracleInfoByteLength,
-  oracleStateByteLength
+  oracleStateByteLength,
+  commitmentHash,
+  getSignature as getOracleSig
 } from "./oracle"
-import { getLmsrSats, getLmsrShas, getLmsrMerklePath, lmsrScaled, SatScaling, balance } from "./lmsr"
-import { hash } from "./sha"
+import { getLmsrSats, SatScaling, balance } from "./lmsr"
 import { getMerkleRootByPath } from "./merkleTree"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
-import { rabinSig, rabinPrivKey } from "rabinsig"
-import { cloneDeep } from "./utils"
-import { hex2IntArray } from "./hex"
+import { rabinPrivKey, privKeyToPubKey } from "rabinsig"
+import { hex2IntArray, int2Hex, getIntFromOP } from "./hex"
 
 const feeb = 0.5
 
@@ -130,24 +122,31 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
   const oracleKeysHex = asm[version.oracleKeyPos]
   const oracleCount = oracleKeysHex.length / (oracleInfoByteLength * 2)
 
-  const globalOptionCount = parseInt(asm[version.globalOptionCountPos], 16)
+  const globalOptionCount = getIntFromOP(asm[version.globalOptionCountPos])
 
-  const balanceTableRootPos = stateData.length - balanceTableByteLength
+  const balanceTableRootPos = stateData.length - balanceTableByteLength * 2
   const balanceTableRoot = stateData.slice(balanceTableRootPos)
 
-  const globalShareStatusPos = balanceTableRootPos - globalOptionCount
+  const globalShareStatusPos = balanceTableRootPos - globalOptionCount * 2
   const globalShareStatus = stateData.slice(globalShareStatusPos, balanceTableRootPos)
 
   const globalLiquidityPos = globalShareStatusPos - 2
   const globalLiquidity = parseInt(stateData.slice(globalLiquidityPos, globalShareStatusPos), 16)
 
-  const globalVotesLength = globalOptionCount * voteCountByteLen
+  const globalVotesLength = globalOptionCount * voteCountByteLen * 2
   const globalVotesPos = globalLiquidityPos - globalVotesLength
   const globalVotesHex = stateData.slice(globalVotesPos, globalLiquidityPos)
 
-  const oracleStatesLen = oracleCount * oracleStateByteLength
+  const oracleStatesLen = oracleCount * oracleStateByteLength * 2
   const oracleStatesPos = globalVotesPos - oracleStatesLen
   const globalOracleStates = stateData.slice(oracleStatesPos, globalVotesPos)
+
+  // console.log(balanceTableRoot)
+  // console.log()
+  // console.log(globalShareStatus)
+  // console.log(globalLiquidity)
+  // console.log(globalVotesHex)
+  // console.log(globalOracleStates)
 
   const gobalDecisionPos = oracleStatesPos - 4
   const globalDecisionState = stateData.slice(gobalDecisionPos, oracleStatesPos)
@@ -166,7 +165,7 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
       pubKey: bsv.PublicKey.fromHex(asm[version.creatorPubKeyPos]),
       payoutAddress: bsv.Address.fromHex(asm[version.creatorPayoutAddressPos])
     },
-    creatorFee: parseInt(asm[version.creatorFeePos], 16)
+    creatorFee: getIntFromOP(asm[version.creatorFeePos])
   }
 }
 
@@ -238,23 +237,54 @@ export function getAddEntryTx(
     .updateMarket(
       new SigHashPreimage(preimage),
       1, // action = Add entry
-      new Ripemd160(payoutAddress.toHex()),
+      new Ripemd160(payoutAddress.hashBuffer.toString("hex")),
       changeSats,
       new Bytes(getEntryHex(entry)),
       new Bytes(lastEntry),
       new Bytes(lastMerklePath),
       0,
       new Bytes(""),
-      new Bytes(""),
+      new Sig("00"),
       new Bytes(""),
       0,
-      0,
+      0n,
       0,
       0
     )
     .toScript() as bsv.Script
 
+  // console.log([
+  //   new SigHashPreimage(preimage).toLiteral(),
+  //   1, // action = Add entry
+  //   new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
+  //   changeSats,
+  //   new Bytes(getEntryHex(entry)).toLiteral(),
+  //   new Bytes(lastEntry).toLiteral(),
+  //   new Bytes(lastMerklePath).toLiteral(),
+  //   0,
+  //   new Bytes("").toLiteral(),
+  //   new Sig("00").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   0,
+  //   0n,
+  //   0,
+  //   0
+  // ])
+
   newTx.inputs[0].setScript(unlockingScript)
+
+  // console.log(new SigHashPreimage(preimage).toLiteral())
+  // console.log(newTx.outputs[1].satoshis)
+  // console.log(newTx.toString())
+  // console.log(prevTx.outputs[0].satoshis)
+
+  // console.log(newMarket)
+  // console.log(newTx.outputs[0].satoshis)
+  // console.log(changeSats)
+  // console.log(new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral())
+
+  // console.log(newTx.outputs[1].script.toHex())
+
   return newTx
 }
 
@@ -300,6 +330,8 @@ export function getUpdateEntryTx(
     const winningShares = oldEntry.balance.shares[decision]
     const redeemed = winningShares - newEntry.balance.shares[decision]
 
+    // FIXME: market creator can redeem invalid tokens as well if resolved
+
     if (redeemed) {
       const redeemSats = redeemed * SatScaling
       newTx.outputs[0].satoshis = prevTx.outputs[0].satoshis - redeemSats
@@ -324,7 +356,7 @@ export function getUpdateEntryTx(
     .updateMarket(
       new SigHashPreimage(preimage.toString("hex")),
       2, // action = Update entry
-      new Ripemd160(payoutAddress.toHex()),
+      new Ripemd160(payoutAddress.hashBuffer.toString("hex")),
       changeSats,
       new Bytes(getEntryHex(newEntry)),
       new Bytes(""),
@@ -334,7 +366,7 @@ export function getUpdateEntryTx(
       new Sig(signature.toString("hex")),
       new Bytes(merklePath),
       0,
-      0,
+      0n,
       0,
       0
     )
@@ -344,11 +376,44 @@ export function getUpdateEntryTx(
   return newTx
 }
 
-export function getOracleCommitTx(prevTx: bsv.Transaction, rabinPrivKey: rabinPrivKey): bsv.Transaction {
+export function getOracleCommitTx(
+  prevTx: bsv.Transaction,
+  rabinPrivKey: rabinPrivKey,
+  payoutAddress: bsv.Address,
+  utxos: bsv.Transaction.UnspentOutput[],
+  spendingPrivKey: bsv.PrivateKey
+): bsv.Transaction {
+  // TODO: Offer option to fund transaction separately?
+
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
   const token = getToken(prevMarket)
 
+  const rabinPubKey = privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
+
+  const oracleIndex = prevMarket.oracles.findIndex(oracle => oracle.pubKey === rabinPubKey)
+  const oracle = prevMarket.oracles[oracleIndex]
+
+  if (!oracle) throw new Error("Oracle not found.")
+
+  const newOracles = prevMarket.oracles
+  newOracles[oracleIndex] = {
+    ...oracle,
+    committed: true
+  }
+
+  const newMarket = {
+    ...prevMarket,
+    oracles: newOracles
+  }
+
   const newTx = getUpdateMarketTx(prevTx, newMarket)
+
+  const sigContent = commitmentHash + prevTx.hash
+  const signature = getOracleSig(sigContent, rabinPrivKey)
+  const signatureBytes = int2Hex(signature.signature)
+
+  const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
+  const preimage = getPreimage(prevTx, newTx, sighashType)
 
   token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
 
@@ -365,41 +430,85 @@ export function getOracleCommitTx(prevTx: bsv.Transaction, rabinPrivKey: rabinPr
       new Bytes(""),
       new Bytes(""),
       new Bytes(""),
-      oraclePos,
-      signature,
-      paddingCount,
+      oracleIndex,
+      signature.signature,
+      signature.paddingByteCount,
       0
     )
     .toScript() as bsv.Script
 
   newTx.inputs[0].setScript(unlockingScript)
+
+  fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
+
   return newTx
 }
 
-export function getDecideTx(prevTx: bsv.Transaction, result: 1 | 0, signatures: rabinSig[]): bsv.Transaction {
-  const sigHex = getOracleSigsString(signatures)
-
+export function getDecideTx(
+  prevTx: bsv.Transaction,
+  result: 1 | 0,
+  rabinPrivKey: rabinPrivKey,
+  payoutAddress: bsv.Address,
+  utxos: bsv.Transaction.UnspentOutput[],
+  spendingPrivKey: bsv.PrivateKey
+): bsv.Transaction {
+  // TODO: Offer option to fund transaction separately?
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
-  const newMarket = {
-    ...prevMarket,
-    status: {
-      decided: true,
-      decision: result
-    }
+  const token = getToken(prevMarket)
+
+  const rabinPubKey = privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
+
+  const oracleIndex = prevMarket.oracles.findIndex(oracle => oracle.pubKey === rabinPubKey)
+  const oracle = prevMarket.oracles[oracleIndex]
+
+  if (!oracle) throw new Error("Oracle not found.")
+
+  const newOracles = prevMarket.oracles
+  newOracles[oracleIndex] = {
+    ...oracle,
+    committed: true
   }
 
-  const newTx = getUpdateTx(prevTx, newMarket)
-  const preimage = getPreimage(prevTx, newTx)
+  const newMarket = {
+    ...prevMarket,
+    oracles: newOracles
+  }
 
-  const token = getToken(prevMarket)
+  const newTx = getUpdateMarketTx(prevTx, newMarket)
+
+  const sigContent = commitmentHash + prevTx.hash
+  const signature = getOracleSig(sigContent, rabinPrivKey)
+  const signatureBytes = int2Hex(signature.signature)
+
+  const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
+  const preimage = getPreimage(prevTx, newTx, sighashType)
 
   token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
 
   const unlockingScript = token
-    .decide(new SigHashPreimage(preimage.toString("hex")), result, new Bytes(sigHex))
+    .updateMarket(
+      new SigHashPreimage(preimage.toString("hex")),
+      3, // action = Update entry
+      new Bytes(""),
+      0,
+      new Bytes(""),
+      new Bytes(""),
+      new Bytes(""),
+      0,
+      new Bytes(""),
+      new Bytes(""),
+      new Bytes(""),
+      oracleIndex,
+      signature.signature,
+      signature.paddingByteCount,
+      0
+    )
     .toScript() as bsv.Script
 
   newTx.inputs[0].setScript(unlockingScript)
+
+  fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
+
   return newTx
 }
 
@@ -420,104 +529,22 @@ export function fundTx(
   changeAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[]
 ): bsv.Transaction {
-  const inputAmount = tx.inputs.length
+  const inputCount = tx.inputs.length
 
   tx.change(changeAddress)
 
   tx.from(utxos)
 
-  const fundingInputs = tx.inputs.slice(inputAmount, tx.inputs.length)
-
   // Check amount
   if (tx.inputAmount < tx.outputAmount) throw new Error(`Input amount needs to be at least ${tx.outputAmount}`)
 
+  const fundingInputs = tx.inputs.slice(inputCount, tx.inputs.length)
+
   fundingInputs.forEach((input: bsv.Transaction.Input, index: number) => {
-    const [signature] = input.getSignatures(tx, privateKey, index + inputAmount)
+    const [signature] = input.getSignatures(tx, privateKey, index + inputCount)
     if (!signature) throw new Error("Invalid privateKey")
     input.addSignature(tx, signature)
   })
 
   return tx
-}
-
-export function getIntFromOP(op: string): number {
-  const numString = op.startsWith("OP") ? op.slice(3) : op
-  return parseInt(numString)
-}
-
-export function getFunctionName(script: bsv.Script): string {
-  const asm = script.toASM().split(" ")
-
-  const functionOp = getIntFromOP(asm[asm.length - 1])
-
-  if (functionOp === 0) {
-    return "addEntry"
-  } else if (functionOp === 1) {
-    return "updateEntry"
-  } else if (functionOp === 2) {
-    return "redeem"
-  } else if (functionOp === 3) {
-    return "decide"
-  } else {
-    throw new Error("No known function")
-  }
-}
-
-export function getNewEntries(prevEntries: entry[], script: bsv.Script): entry[] {
-  const asm = script.toASM().split(" ")
-
-  const functionOp = getIntFromOP(asm[asm.length - 1])
-  // const functionPos = parseInt(functionOp.slice(3))
-  // const functionName = functionNames[functionPos]
-
-  if (functionOp === 0) {
-    // addEntry
-
-    const entry: entry = {
-      balance: {
-        liquidity: getIntFromOP(asm[1]),
-        sharesFor: getIntFromOP(asm[2]),
-        sharesAgainst: getIntFromOP(asm[3])
-      },
-      publicKey: bsv.PublicKey.fromHex(asm[4])
-    }
-
-    const newEntries = cloneDeep(prevEntries) as entry[]
-    newEntries.push(entry)
-    return newEntries
-  } else if (functionOp === 1) {
-    // updateEntry
-
-    const publicKey = bsv.PublicKey.fromHex(asm[7])
-
-    const entry: entry = {
-      balance: {
-        liquidity: getIntFromOP(asm[1]),
-        sharesFor: getIntFromOP(asm[2]),
-        sharesAgainst: getIntFromOP(asm[3])
-      },
-      publicKey
-    }
-
-    const entryIndex = prevEntries.findIndex(entry => entry.publicKey.toString() === publicKey.toString())
-
-    const newEntries = cloneDeep(prevEntries) as entry[]
-    newEntries[entryIndex] = entry
-    return newEntries
-  } else if (functionOp === 2) {
-    // redeem
-
-    const publicKey = bsv.PublicKey.fromHex(asm[4])
-    const entryIndex = prevEntries.findIndex(entry => entry.publicKey.toString() === publicKey.toString())
-
-    const entry = cloneDeep(prevEntries[entryIndex]) as entry
-    entry.balance.sharesFor = 0
-    entry.balance.sharesAgainst = 0
-
-    const newEntries = cloneDeep(prevEntries) as entry[]
-    newEntries[entryIndex] = entry
-    return newEntries
-  } else {
-    return prevEntries
-  }
 }

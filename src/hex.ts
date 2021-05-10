@@ -44,12 +44,18 @@ export function hex2BigInt(hex: string): bigint {
 }
 
 export function hex2IntArray(hex: string, bytes = 1): number[] {
+  const byteChars = bytes * 2
+
   return hex
     .split("")
-    .reduce((shares: string[], n, i) => (!(i % bytes) ? shares.concat([hex.slice(i, i + bytes)]) : shares), [])
-    .map(parseInt)
+    .reduce((shares: string[], n, i) => (!(i % byteChars) ? shares.concat([hex.slice(i, i + byteChars)]) : shares), [])
+    .map(x => parseInt(x, 16))
 }
 
 export function splitHexByNumber(hex: string, length: number): string[] {
   return hex.match(new RegExp(".{1," + length.toString() + "}", "g")) || [] // eslint-disable-line
+}
+
+export function getIntFromOP(op: string): number {
+  return op.startsWith("OP") ? parseInt(op.slice(3)) : parseInt(op, 16)
 }

@@ -28,6 +28,6 @@ test("convert from and to hex", () => {
 
 test("hex2IntArray", () => {
   const numbers = [1, 2, 3, 4, 5]
-  const hex = numbers.map(int2Hex).join("")
-  expect(hex2IntArray(hex)).toBe(numbers)
+  const hex = numbers.map(n => int2Hex(n)).join("")
+  expect(hex2IntArray(hex)).toEqual(numbers)
 })
