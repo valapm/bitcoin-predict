@@ -9,6 +9,7 @@ import {
   getDecideTx,
   isValidMarketUpdateTx,
   getMarketFromScript
+  // getDebugParams
 } from "../src/transaction"
 import { privKeyToPubKey, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
@@ -130,26 +131,42 @@ test("add entry", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
-// test("update entry", () => {
-//   const tx = buildTx(market)
-//   fundTx(tx, privateKey, address, utxos)
+test("update entry", () => {
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
 
-//   const newBalance: balance = {
-//     liquidity: 1,
-//     sharesFor: 1,
-//     sharesAgainst: 0
-//   }
+  const newBalance: balance = {
+    liquidity: 0,
+    shares: [1, 0, 2]
+  }
 
-//   const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey)
-//   fundTx(newTx, privateKey, address, utxos)
+  const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
 
-//   const newEntry: entry = cloneDeep(entries[0])
-//   newEntry.balance.sharesFor += 1
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
 
-//   const newEntries = [newEntry]
+  const newEntries = [newEntry]
 
-//   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
-// })
+  // console.log(getDebugParams(newTx))
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+// test("update to invalid balance", () =>)
+
+// test("sell liquidity", () => {})
+
+// test("oracle commmitment", () => {})
+
+// test("oracle vote", () => {})
+
+// test("oracle vote and market resolve", () => {})
+
+// test("redeem winning shares", () => {})
+
+// test("sell liquidity after market is resolved", () => {})
+
+// test("redeem invalid after market is resolved", () => {})
 
 // test("invalid redeem balance", () => {
 //   const tx = buildTx(market)

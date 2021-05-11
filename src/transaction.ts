@@ -372,7 +372,32 @@ export function getUpdateEntryTx(
     )
     .toScript() as bsv.Script
 
+  // console.log([
+  //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
+  //   2, // action = Update entry
+  //   new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
+  //   changeSats,
+  //   new Bytes(getEntryHex(newEntry)).toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   oldEntry.balance.liquidity,
+  //   new Bytes(getSharesHex(oldEntry.balance.shares)).toLiteral(),
+  //   new Sig(signature.toString("hex")).toLiteral(),
+  //   new Bytes(merklePath).toLiteral(),
+  //   0,
+  //   0n,
+  //   0,
+  //   0
+  // ])
+
   newTx.inputs[0].setScript(unlockingScript)
+
+  // console.log(newTx.toString())
+  // console.log(prevTx.outputs[0].satoshis)
+
+  // const asm = newTx.outputs[0].script.toASM().split(" ")
+  // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
+
   return newTx
 }
 
@@ -548,3 +573,30 @@ export function fundTx(
 
   return tx
 }
+
+// export function getDebugParams(tx: bsv.Transaction): string {
+//   function getBytes(asm: string): string {
+//     const bytes = asm === "0" ? "" : asm
+//     return new Bytes(bytes).toLiteral()
+//   }
+
+//   const unlockingScript = tx.inputs[0].script.toASM().split(" ")
+//   const tokenParams = [
+//     // new SigHashPreimage(unlockingScript[0]).toLiteral(),
+//     getIntFromOP(unlockingScript[1]), // action = Add entry
+//     new Ripemd160(unlockingScript[2]).toLiteral(),
+//     getIntFromOP(unlockingScript[3]),
+//     getBytes(unlockingScript[4]),
+//     getBytes(unlockingScript[5]),
+//     getBytes(unlockingScript[6]),
+//     getIntFromOP(unlockingScript[7]),
+//     getBytes(unlockingScript[8]),
+//     new Sig(unlockingScript[9]).toLiteral(),
+//     getBytes(unlockingScript[10]),
+//     getIntFromOP(unlockingScript[11]),
+//     hex2BigInt(unlockingScript[12]).toString(),
+//     getIntFromOP(unlockingScript[13]),
+//     getIntFromOP(unlockingScript[14])
+//   ]
+//   return JSON.stringify(tokenParams)
+// }

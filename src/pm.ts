@@ -23,12 +23,12 @@ export type version = {
 export const versions: version[] = [
   {
     identifier: "f1b59d4a10014958b5123b1d795e2514",
-    oracleKeyPos: 26,
-    globalOptionCountPos: 27,
-    requiredVotesPos: 28,
-    creatorPubKeyPos: 29,
-    creatorPayoutAddressPos: 30,
-    creatorFeePos: 31,
+    oracleKeyPos: 14,
+    globalOptionCountPos: 15,
+    requiredVotesPos: 16,
+    creatorPubKeyPos: 17,
+    creatorPayoutAddressPos: 18,
+    creatorFeePos: 19,
     maxOptionCount: 6,
     maxOracleCount: 3
   }
