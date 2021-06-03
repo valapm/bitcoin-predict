@@ -255,7 +255,7 @@ export function getAddEntryTx(
     .toScript() as bsv.Script
 
   // console.log([
-  //   new SigHashPreimage(preimage).toLiteral(),
+  //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
   //   1, // action = Add entry
   //   new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
   //   changeSats,
@@ -274,17 +274,11 @@ export function getAddEntryTx(
 
   newTx.inputs[0].setScript(unlockingScript)
 
-  // console.log(new SigHashPreimage(preimage).toLiteral())
-  // console.log(newTx.outputs[1].satoshis)
   // console.log(newTx.toString())
   // console.log(prevTx.outputs[0].satoshis)
 
-  // console.log(newMarket)
-  // console.log(newTx.outputs[0].satoshis)
-  // console.log(changeSats)
-  // console.log(new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral())
-
-  // console.log(newTx.outputs[1].script.toHex())
+  // const asm = prevTx.outputs[0].script.toASM().split(" ")
+  // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
 
   return newTx
 }

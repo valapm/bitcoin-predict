@@ -56,7 +56,7 @@ const address = privateKey.toAddress()
 const entry: entry = {
   publicKey: privateKey.publicKey,
   balance: {
-    liquidity: 1,
+    liquidity: 2,
     shares: [0, 0, 0]
   }
 }
@@ -131,9 +131,47 @@ test("add entry", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
-// test add with liquidity 0
+test("add entry with liquidity", () => {
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newEntry: entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 1,
+      shares: [1, 0, 2]
+    }
+  }
+
+  const newTx = getAddEntryTx(tx, entries, newEntry, marketCreator.payoutAddress, utxos, privateKey)
+
+  const newEntries = entries.concat([newEntry])
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
 
 test("update entry", () => {
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 2,
+    shares: [1, 0, 2]
+  }
+
+  const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
+
+  const newEntries = [newEntry]
+
+  // console.log(getDebugParams(newTx))
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+test("update entry and sell liquidity", () => {
   const tx = buildTx(market)
   fundTx(tx, privateKey, address, utxos)
 
@@ -154,11 +192,47 @@ test("update entry", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
-// test liquidity set to 0
+test("update entry and sell all liqudity", () => {
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
 
-// test("update to invalid balance", () =>)
+  const newBalance: balance = {
+    liquidity: 0,
+    shares: [1, 0, 2]
+  }
 
-// test("sell liquidity", () => {})
+  const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
+
+  const newEntries = [newEntry]
+
+  // console.log(getDebugParams(newTx))
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+test("update to invalid balance", () => {
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 2,
+    shares: [1, 0, -1]
+  }
+
+  const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
+
+  const newEntries = [newEntry]
+
+  // console.log(getDebugParams(newTx))
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(false)
+})
 
 // test("oracle commmitment", () => {})
 
