@@ -211,11 +211,11 @@ export function getAddEntryTx(
   const lastMerklePath = getMerklePath(prevEntries, prevEntries.length - 1)
 
   const newEntries = prevEntries.concat([entry])
-  const newBalance = getMarketBalance(newEntries, optionCount)
+  const newGlobalBalance = getMarketBalance(newEntries, optionCount)
 
   const newMarket: marketInfo = {
     ...prevMarket,
-    balance: newBalance,
+    balance: newGlobalBalance,
     balanceMerkleRoot: getMerkleRoot(newEntries)
   }
 
@@ -224,7 +224,8 @@ export function getAddEntryTx(
   fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID
-  const preimage = getPreimage(prevTx, newTx, sighashType).toString("hex")
+
+  const preimage = getPreimage(prevTx, newTx, sighashType)
 
   const changeOutput = newTx.getChangeOutput()
   const changeSats = changeOutput ? changeOutput.satoshis : 0
@@ -235,7 +236,7 @@ export function getAddEntryTx(
 
   const unlockingScript = token
     .updateMarket(
-      new SigHashPreimage(preimage),
+      new SigHashPreimage(preimage.toString("hex")),
       1, // action = Add entry
       new Ripemd160(payoutAddress.hashBuffer.toString("hex")),
       changeSats,
@@ -313,13 +314,14 @@ export function getUpdateEntryTx(
 
   const newEntries = [...prevEntries]
   newEntries[entryIndex] = newEntry
+  const newGlobalBalance = getMarketBalance(newEntries, optionCount)
 
   const merklePath = getMerklePath(prevEntries, entryIndex)
   const newMerklePath = getMerklePath(newEntries, entryIndex)
 
   const newMarket: marketInfo = {
     ...prevMarket,
-    balance: getMarketBalance(newEntries, optionCount),
+    balance: newGlobalBalance,
     balanceMerkleRoot: getMerkleRootByPath(sha256(getEntryHex(newEntry)), newMerklePath)
   }
 
@@ -341,6 +343,7 @@ export function getUpdateEntryTx(
   fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID
+
   const preimage = getPreimage(prevTx, newTx, sighashType)
 
   const signature = getSignature(preimage, privateKey, sighashType)
@@ -395,7 +398,7 @@ export function getUpdateEntryTx(
   // console.log(newTx.toString())
   // console.log(prevTx.outputs[0].satoshis)
 
-  // const asm = newTx.outputs[0].script.toASM().split(" ")
+  // const asm = prevTx.outputs[0].script.toASM().split(" ")
   // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
 
   return newTx

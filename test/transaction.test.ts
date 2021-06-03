@@ -131,12 +131,14 @@ test("add entry", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
+// test add with liquidity 0
+
 test("update entry", () => {
   const tx = buildTx(market)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
-    liquidity: 0,
+    liquidity: 1,
     shares: [1, 0, 2]
   }
 
@@ -151,6 +153,8 @@ test("update entry", () => {
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
+
+// test liquidity set to 0
 
 // test("update to invalid balance", () =>)
 
