@@ -553,6 +553,13 @@ export function fundTx(
 ): bsv.Transaction {
   const inputCount = tx.inputs.length
 
+  // Handle dust limit TODO: Is at 135 now, 0 @ end 2021
+  const dustLimit = bsv.Transaction.DUST_AMOUNT
+  const marketOutput = tx.outputs[0]
+  if (marketOutput.satoshis < dustLimit) {
+    marketOutput.satoshis = dustLimit
+  }
+
   tx.change(changeAddress)
 
   tx.from(utxos)

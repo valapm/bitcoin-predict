@@ -126,6 +126,8 @@ declare module "bsv" {
   }
 
   export class Transaction {
+    static DUST_AMOUNT: number
+
     inputs: Transaction.Input[]
     outputs: Transaction.Output[]
     readonly id: string

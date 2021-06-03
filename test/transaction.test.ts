@@ -104,6 +104,22 @@ test("build and fund pm init transaction", () => {
   expect(isValidMarketTx(tx, entries)).toBe(true)
 })
 
+test("build and fund pm init transaction without liquidity", () => {
+  const entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 0,
+      shares: [0, 0, 0]
+    }
+  }
+  const newEntries = [entry]
+  const market = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee)
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+
+  expect(isValidMarketTx(tx, newEntries)).toBe(true)
+})
+
 test("convert between market and script consistency", () => {
   const tx = buildTx(market)
   const extractedMarket = getMarketFromScript(tx.outputs[0].script)
