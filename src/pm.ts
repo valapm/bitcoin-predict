@@ -17,12 +17,13 @@ export type version = {
   creatorFeePos: number
   maxOptionCount: number
   maxOracleCount: number
+  devFee: number
 }
 
 // Keep track of old versions for compatibility.
 export const versions: version[] = [
   {
-    identifier: "7016534fedfec6dfaaeaa943bb0650fb",
+    identifier: "a518fa9ad10e507532c90ee58f20ba55",
     oracleKeyPos: 14,
     globalOptionCountPos: 15,
     requiredVotesPos: 16,
@@ -30,7 +31,8 @@ export const versions: version[] = [
     creatorPayoutAddressPos: 18,
     creatorFeePos: 19,
     maxOptionCount: 6,
-    maxOracleCount: 3
+    maxOracleCount: 3,
+    devFee: 1
   }
 ]
 
@@ -99,6 +101,8 @@ export const marketStatusHexLength = 4
 export const entryLiqudityPos = 33
 export const entrySharePos = 34
 
+export const developerPayoutAddress = "00ae2c80a6e4bd7a01a0c8e6679f888234efac02b6"
+
 // export function getCompiledPM(): void {
 //   const contractPath = require.resolve("scrypt_boilerplate/contracts/predictionMarket.scrypt")
 //   compile({ path: contractPath }, { desc: true })
@@ -164,7 +168,7 @@ export function getToken(market: marketInfo): PM {
     market.details.options.length, // globalOptionCount
     1, // requiredVotes,
     new PubKey(market.creator.pubKey.toHex()),
-    new Ripemd160(market.creator.payoutAddress.toHex()),
+    new Ripemd160(market.creator.payoutAddress.hashBuffer.toString("hex")),
     market.creatorFee
   ) as PM
 

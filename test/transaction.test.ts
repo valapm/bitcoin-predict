@@ -193,7 +193,7 @@ test("update entry and sell liquidity", () => {
 
   const newBalance: balance = {
     liquidity: 1,
-    shares: [1, 0, 2]
+    shares: [0, 0, 0]
   }
 
   const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
@@ -202,6 +202,8 @@ test("update entry and sell liquidity", () => {
   newEntry.balance = newBalance
 
   const newEntries = [newEntry]
+
+  // console.log(newTx.outputs.slice(1).map(output => output.script.toHex()))
 
   // console.log(getDebugParams(newTx))
 
@@ -218,6 +220,9 @@ test("update entry and sell all liqudity", () => {
   }
 
   const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  // console.log(newTx.outputs[0].satoshis)
+  // console.log(getMarketFromScript(newTx.outputs[0].script))
 
   const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance = newBalance
@@ -238,16 +243,9 @@ test("update to invalid balance", () => {
     shares: [1, 0, -1]
   }
 
-  const newTx = getUpdateEntryTx(tx, entries, newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
-
-  const newEntry: entry = cloneDeep(entries[0])
-  newEntry.balance = newBalance
-
-  const newEntries = [newEntry]
-
-  // console.log(getDebugParams(newTx))
-
-  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(false)
+  expect(() =>
+    getUpdateEntryTx(tx, entries, newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+  ).toThrow()
 })
 
 // test("oracle commmitment", () => {})

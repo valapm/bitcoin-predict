@@ -15,7 +15,8 @@ import {
   getMinMarketSatBalance,
   voteCountByteLen,
   balanceTableByteLength,
-  getSharesHex
+  getSharesHex,
+  developerPayoutAddress
 } from "./pm"
 import {
   getOracleDetailsFromHex,
@@ -96,6 +97,22 @@ export function getUpdateMarketTx(
       output: prevTx.outputs[0] // prevTx of newTx here?
     })
   )
+
+  const prevBalance = prevTx.outputs[0].satoshis
+  const newBalance = tx.outputs[0].satoshis
+
+  // Add fee outputs to dev and creator
+  const redeemSats = prevBalance - newBalance
+  if (redeemSats > 0) {
+    const version = getMarketVersion(market.version)
+
+    const developerSatFee = Math.floor((version.devFee * redeemSats) / 100)
+    const creatorSatFee = Math.floor((market.creatorFee * redeemSats) / 100)
+
+    tx.to(bsv.Address.fromHex(developerPayoutAddress), developerSatFee)
+    tx.to(market.creator.payoutAddress, creatorSatFee)
+  }
+
   return tx
 }
 
@@ -163,7 +180,7 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
     balanceMerkleRoot: balanceTableRoot,
     creator: {
       pubKey: bsv.PublicKey.fromHex(asm[version.creatorPubKeyPos]),
-      payoutAddress: bsv.Address.fromHex(asm[version.creatorPayoutAddressPos])
+      payoutAddress: bsv.Address.fromHex("00" + asm[version.creatorPayoutAddressPos])
     },
     creatorFee: getIntFromOP(asm[version.creatorFeePos])
   }
