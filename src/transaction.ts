@@ -30,7 +30,7 @@ import { getMerkleRootByPath } from "./merkleTree"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinPrivKey, privKeyToPubKey } from "rabinsig"
-import { hex2IntArray, int2Hex, getIntFromOP } from "./hex"
+import { hex2IntArray, int2Hex, getIntFromOP, reverseHex } from "./hex"
 
 const feeb = 0.5
 
@@ -447,7 +447,7 @@ export function getOracleCommitTx(
 
   const newTx = getUpdateMarketTx(prevTx, newMarket)
 
-  const sigContent = commitmentHash + prevTx.hash
+  const sigContent = commitmentHash + reverseHex(prevTx.hash)
   const signature = getOracleSig(sigContent, rabinPrivKey)
   const signatureBytes = int2Hex(signature.signature)
 
@@ -460,14 +460,14 @@ export function getOracleCommitTx(
     .updateMarket(
       new SigHashPreimage(preimage.toString("hex")),
       3, // action = Update entry
-      new Bytes(""),
+      new Ripemd160("00"),
       0,
       new Bytes(""),
       new Bytes(""),
       new Bytes(""),
       0,
       new Bytes(""),
-      new Bytes(""),
+      new Sig("00"),
       new Bytes(""),
       oracleIndex,
       signature.signature,
@@ -476,9 +476,33 @@ export function getOracleCommitTx(
     )
     .toScript() as bsv.Script
 
+  // console.log([
+  //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
+  //   3, // action = Update entry
+  //   new Ripemd160("00").toLiteral(),
+  //   0,
+  //   new Bytes("").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   0,
+  //   new Bytes("").toLiteral(),
+  //   new Sig("00").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   oracleIndex,
+  //   signature.signature.toString(),
+  //   signature.paddingByteCount,
+  //   0
+  // ])
+
   newTx.inputs[0].setScript(unlockingScript)
 
   fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
+
+  // console.log(newTx.toString())
+  // console.log(prevTx.outputs[0].satoshis)
+
+  // const asm = prevTx.outputs[0].script.toASM().split(" ")
+  // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
 
   return newTx
 }
@@ -535,7 +559,7 @@ export function getDecideTx(
       new Bytes(""),
       0,
       new Bytes(""),
-      new Bytes(""),
+      new Sig("00"),
       new Bytes(""),
       oracleIndex,
       signature.signature,

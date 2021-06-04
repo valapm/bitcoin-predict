@@ -248,7 +248,16 @@ test("update to invalid balance", () => {
   ).toThrow()
 })
 
-// test("oracle commmitment", () => {})
+test("oracle commmitment", () => {
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newTx = getOracleCommitTx(tx, rabinPrivKey1, address, utxos, privateKey)
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+
+  expect(newMarket.oracles[0].committed).toBe(true)
+  expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
+})
 
 // test("oracle vote", () => {})
 
