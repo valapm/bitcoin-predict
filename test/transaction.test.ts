@@ -273,10 +273,11 @@ test("oracle vote succeeds", () => {
 
   const newTx = getOracleVoteTx(tx, vote, rabinPrivKey1, address, utxos, privateKey)
   const newMarket = getMarketFromScript(newTx.outputs[0].script)
-  const newVotes = committedMarket.status.votes[0] + committedMarket.oracles[0].votes
+  const newVotes = committedMarket.status.votes[vote] + committedMarket.oracles[0].votes
 
+  expect(newMarket.status.decided).toBe(false)
   expect(newMarket.oracles[0].voted).toBe(true)
-  expect(newMarket.status.votes[0]).toBe(newVotes)
+  expect(newMarket.status.votes[vote]).toBe(newVotes)
   expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
 })
 
@@ -289,7 +290,47 @@ test("oracle vote not possible without commitment", () => {
   expect(() => getOracleVoteTx(tx, vote, rabinPrivKey1, address, utxos, privateKey)).toThrow()
 })
 
-// test("oracle vote and market resolve", () => {})
+test("oracle vote and market resolve", () => {
+  const committedMarket: marketInfo = cloneDeep(market)
+  committedMarket.oracles[0].committed = true
+  committedMarket.requiredVotes = 40
+
+  const tx = buildTx(committedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const vote = 1
+
+  const newTx = getOracleVoteTx(tx, vote, rabinPrivKey1, address, utxos, privateKey)
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newVotes = committedMarket.status.votes[vote] + committedMarket.oracles[0].votes
+
+  expect(newMarket.status.decided).toBe(true)
+  expect(newMarket.oracles[0].voted).toBe(true)
+  expect(newMarket.status.votes[vote]).toBe(newVotes)
+  expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
+})
+
+test("Two oracles vote and market resolve", () => {
+  const committedMarket: marketInfo = cloneDeep(market)
+  committedMarket.oracles[0].committed = true
+  committedMarket.oracles[1].committed = true
+
+  const tx = buildTx(committedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const vote = 2
+
+  const newTx = getOracleVoteTx(tx, vote, rabinPrivKey1, address, utxos, privateKey)
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+
+  expect(newMarket.status.decided).toBe(false)
+
+  const newTx2 = getOracleVoteTx(newTx, vote, rabinPrivKey2, address, utxos, privateKey)
+  const newMarket2 = getMarketFromScript(newTx2.outputs[0].script)
+
+  expect(newMarket2.status.decided).toBe(true)
+  expect(isValidMarketUpdateTx(newTx2, newTx, entries)).toBe(true)
+})
 
 // test("redeem winning shares", () => {})
 

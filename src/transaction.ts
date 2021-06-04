@@ -537,20 +537,28 @@ export function getOracleVoteTx(
   }
 
   const newVotes = prevMarket.status.votes
-  newVotes[oracleIndex] = newVotes[oracleIndex] + oracle.votes
+  newVotes[vote] = newVotes[vote] + oracle.votes
+
+  const newMarketStatus = {
+    ...prevMarket.status,
+    votes: newVotes
+  }
+
+  if (newVotes[vote] >= prevMarket.requiredVotes) {
+    newMarketStatus.decided = true
+    newMarketStatus.decision = vote
+  }
 
   const newMarket = {
     ...prevMarket,
-    oracles: newOracles
+    oracles: newOracles,
+    status: newMarketStatus
   }
-  newMarket.status.votes = newVotes
 
   const newTx = getUpdateMarketTx(prevTx, newMarket)
 
   const sigContent = int2Hex(vote, 1) + reverseHex(prevTx.hash)
   const signature = getOracleSig(sigContent, rabinPrivKey)
-
-  console.log(sigContent)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
   const preimage = getPreimage(prevTx, newTx, sighashType)
