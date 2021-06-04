@@ -1,6 +1,6 @@
 import { compile, bsv, buildContractClass, SigHashPreimage, PubKey, Bytes, Sig, Ripemd160 } from "scryptlib"
 import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
-import { int2Hex, toHex, fromHex, hex2IntArray, splitHexByNumber } from "./hex"
+import { int2Hex, toHex, fromHex, hex2IntArray, splitHexByNumber, reverseHex } from "./hex"
 import { isHash, hash, sha256 } from "./sha"
 import { oracleDetail, getOracleDetailsHex, isValidOracleDetails, getOracleStatesHex } from "./oracle"
 import { getLmsrSats, SatScaling, balance } from "./lmsr"
@@ -91,6 +91,7 @@ export type marketInfo = {
   oracles: oracleDetail[]
   creator: creatorInfo
   creatorFee: number
+  requiredVotes: number
 }
 
 export const balanceTableByteLength = 32
@@ -141,7 +142,8 @@ export function getNewMarket(
   entry: entry,
   oracles: oracleDetail[],
   creator: creatorInfo,
-  creatorFee: number
+  creatorFee: number,
+  requiredVotes: number
 ): marketInfo {
   const votes = "0"
     .repeat(details.options.length)
@@ -156,7 +158,8 @@ export function getNewMarket(
     balance: getMarketBalance([entry], details.options.length),
     balanceMerkleRoot: getBalanceMerkleRoot([entry]),
     creator,
-    creatorFee
+    creatorFee,
+    requiredVotes
   }
 }
 
@@ -166,7 +169,7 @@ export function getToken(market: marketInfo): PM {
   const token = new Token( // eslint-disable-line
     new Bytes(getOracleDetailsHex(market.oracles)), // oracleKeys
     market.details.options.length, // globalOptionCount
-    1, // requiredVotes,
+    market.requiredVotes, // requiredVotes,
     new PubKey(market.creator.pubKey.toHex()),
     new Ripemd160(market.creator.payoutAddress.hashBuffer.toString("hex")),
     market.creatorFee
@@ -249,15 +252,22 @@ export function getMarketBalanceHex(entries: entry[], optionCount: number): stri
 export function getMarketStatusHex(status: marketStatus): string {
   const isDecidedHex = status.decided ? "01" : "00"
   const resultHex = int2Hex(status.decision, 1)
-  const votes = status.votes.map(int2Hex).join("")
-  return isDecidedHex + resultHex + votes
+
+  return isDecidedHex + resultHex
 }
 
 export function getMarketStatusfromHex(decisionHex: string, votesHex: string): marketStatus {
+  // console.log(
+  //   votesHex,
+  //   "->",
+  //   splitHexByNumber(votesHex, voteCountByteLen * 2),
+  //   "->",
+  //   splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => parseInt(reverseHex(n), 16))
+  // )
   return {
     decided: Boolean(parseInt(decisionHex.slice(0, 2), 16)),
     decision: parseInt(decisionHex.slice(2, 4), 16),
-    votes: splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => parseInt(n))
+    votes: splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => parseInt(reverseHex(n), 16))
   }
 }
 

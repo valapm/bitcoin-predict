@@ -182,7 +182,8 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
       pubKey: bsv.PublicKey.fromHex(asm[version.creatorPubKeyPos]),
       payoutAddress: bsv.Address.fromHex("00" + asm[version.creatorPayoutAddressPos])
     },
-    creatorFee: getIntFromOP(asm[version.creatorFeePos])
+    creatorFee: getIntFromOP(asm[version.creatorFeePos]),
+    requiredVotes: getIntFromOP(asm[version.requiredVotesPos])
   }
 }
 
@@ -492,6 +493,106 @@ export function getOracleCommitTx(
   //   signature.signature.toString(),
   //   signature.paddingByteCount,
   //   0
+  // ])
+
+  newTx.inputs[0].setScript(unlockingScript)
+
+  fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
+
+  // console.log(newTx.toString())
+  // console.log(prevTx.outputs[0].satoshis)
+
+  // const asm = prevTx.outputs[0].script.toASM().split(" ")
+  // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
+
+  return newTx
+}
+
+export function getOracleVoteTx(
+  prevTx: bsv.Transaction,
+  vote: number,
+  rabinPrivKey: rabinPrivKey,
+  payoutAddress: bsv.Address,
+  utxos: bsv.Transaction.UnspentOutput[],
+  spendingPrivKey: bsv.PrivateKey
+): bsv.Transaction {
+  // TODO: Offer option to fund transaction separately?
+
+  const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
+  const token = getToken(prevMarket)
+
+  const rabinPubKey = privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
+
+  const oracleIndex = prevMarket.oracles.findIndex(oracle => oracle.pubKey === rabinPubKey)
+  const oracle = prevMarket.oracles[oracleIndex]
+
+  if (!oracle) throw new Error("Oracle not found.")
+  if (!oracle.committed) throw new Error("Oracle not committed to this market yet.")
+  if (oracle.voted) throw new Error("Oracle already voted.")
+
+  const newOracles = prevMarket.oracles
+  newOracles[oracleIndex] = {
+    ...oracle,
+    voted: true
+  }
+
+  const newVotes = prevMarket.status.votes
+  newVotes[oracleIndex] = newVotes[oracleIndex] + oracle.votes
+
+  const newMarket = {
+    ...prevMarket,
+    oracles: newOracles
+  }
+  newMarket.status.votes = newVotes
+
+  const newTx = getUpdateMarketTx(prevTx, newMarket)
+
+  const sigContent = int2Hex(vote, 1) + reverseHex(prevTx.hash)
+  const signature = getOracleSig(sigContent, rabinPrivKey)
+
+  console.log(sigContent)
+
+  const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
+  const preimage = getPreimage(prevTx, newTx, sighashType)
+
+  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
+
+  const unlockingScript = token
+    .updateMarket(
+      new SigHashPreimage(preimage.toString("hex")),
+      4, // action = Update entry
+      new Ripemd160("00"),
+      0,
+      new Bytes(""),
+      new Bytes(""),
+      new Bytes(""),
+      0,
+      new Bytes(""),
+      new Sig("00"),
+      new Bytes(""),
+      oracleIndex,
+      signature.signature,
+      signature.paddingByteCount,
+      vote
+    )
+    .toScript() as bsv.Script
+
+  // console.log([
+  //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
+  //   4, // action = Update entry
+  //   new Ripemd160("00").toLiteral(),
+  //   0,
+  //   new Bytes("").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   0,
+  //   new Bytes("").toLiteral(),
+  //   new Sig("00").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   oracleIndex,
+  //   signature.signature.toString(),
+  //   signature.paddingByteCount,
+  //   vote
   // ])
 
   newTx.inputs[0].setScript(unlockingScript)

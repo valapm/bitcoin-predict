@@ -8,7 +8,8 @@ import {
   getAddEntryTx,
   getDecideTx,
   isValidMarketUpdateTx,
-  getMarketFromScript
+  getMarketFromScript,
+  getOracleVoteTx
   // getDebugParams
 } from "../src/transaction"
 import { privKeyToPubKey, rabinPrivKey, rabinPubKey } from "rabinsig"
@@ -96,7 +97,9 @@ const marketDetails: marketDetails = {
   }
 }
 
-const market = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee)
+const requiredVotes = 50
+
+const market = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
 
 test("build and fund pm init transaction", () => {
   const tx = buildTx(market)
@@ -113,7 +116,7 @@ test("build and fund pm init transaction without liquidity", () => {
     }
   }
   const newEntries = [entry]
-  const market = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee)
+  const market = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
   const tx = buildTx(market)
   fundTx(tx, privateKey, address, utxos)
 
@@ -259,7 +262,32 @@ test("oracle commmitment", () => {
   expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
 })
 
-// test("oracle vote", () => {})
+test("oracle vote succeeds", () => {
+  const committedMarket: marketInfo = cloneDeep(market)
+  committedMarket.oracles[0].committed = true
+
+  const tx = buildTx(committedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const vote = 1
+
+  const newTx = getOracleVoteTx(tx, vote, rabinPrivKey1, address, utxos, privateKey)
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newVotes = committedMarket.status.votes[0] + committedMarket.oracles[0].votes
+
+  expect(newMarket.oracles[0].voted).toBe(true)
+  expect(newMarket.status.votes[0]).toBe(newVotes)
+  expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
+})
+
+test("oracle vote not possible without commitment", () => {
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+
+  const vote = 1
+
+  expect(() => getOracleVoteTx(tx, vote, rabinPrivKey1, address, utxos, privateKey)).toThrow()
+})
 
 // test("oracle vote and market resolve", () => {})
 
