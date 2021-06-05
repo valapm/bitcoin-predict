@@ -39,29 +39,12 @@ const rabinPrivKey2: rabinPrivKey = {
 const rabinPubKey1: rabinPubKey = privKeyToPubKey(rabinPrivKey1.p, rabinPrivKey1.q)
 const rabinPubKey2: rabinPubKey = privKeyToPubKey(rabinPrivKey2.p, rabinPrivKey2.q)
 
-const oracleDetails: oracleDetail[] = [
-  {
-    pubKey: rabinPubKey1,
-    votes: 40
-  },
-  {
-    pubKey: rabinPubKey2,
-    votes: 60
-  }
-]
+const creatorFee = 1
+
+const requiredVotes = 50
 
 const privateKey = bsv.PrivateKey.fromString("Kys3cyL5HZ4upzwWsnirv4urUeczpnweiJ2zY5EDBCkRZ5j2TTdj")
 const address = privateKey.toAddress()
-
-const entry: entry = {
-  publicKey: privateKey.publicKey,
-  balance: {
-    liquidity: 2,
-    shares: [0, 0, 0]
-  }
-}
-
-const entries = [entry]
 
 const utxoData = [
   {
@@ -81,24 +64,50 @@ const utxoData = [
 
 const utxos = utxoData.map(utxo => bsv.Transaction.UnspentOutput.fromObject(utxo))
 
-const marketCreator: creatorInfo = {
-  pubKey: privateKey.publicKey,
-  payoutAddress: bsv.Address.fromString("1KCrKrbmjiyHhx8Wp8zKCqLgAbUV5B8okY")
-}
+let oracleDetails: oracleDetail[],
+  entry: entry,
+  entries: entry[],
+  marketCreator: creatorInfo,
+  marketDetails: marketDetails,
+  market: marketInfo
 
-const creatorFee = 1
+beforeEach(() => {
+  oracleDetails = [
+    {
+      pubKey: rabinPubKey1,
+      votes: 40
+    },
+    {
+      pubKey: rabinPubKey2,
+      votes: 60
+    }
+  ]
 
-const marketDetails: marketDetails = {
-  resolve: "test",
-  details: "Here are some details about this market",
-  options: {
-    length: 3
+  entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [0, 0, 0]
+    }
   }
-}
 
-const requiredVotes = 50
+  entries = [entry]
 
-const market = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
+  marketCreator = {
+    pubKey: privateKey.publicKey,
+    payoutAddress: bsv.Address.fromString("1KCrKrbmjiyHhx8Wp8zKCqLgAbUV5B8okY")
+  }
+
+  marketDetails = {
+    resolve: "test",
+    details: "Here are some details about this market",
+    options: {
+      length: 3
+    }
+  }
+
+  market = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
+})
 
 test("build and fund pm init transaction", () => {
   const tx = buildTx(market)
@@ -388,76 +397,73 @@ test("redeem invalid shares", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
-// test("sell liquidity after market is resolved", () => {})
+test("sell liquidity after market is resolved", () => {
+  const entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [1, 0, 2]
+    }
+  }
 
-// test("redeem invalid after market is resolved", () => {})
+  const localMarketCreator = cloneDeep(marketCreator)
+  localMarketCreator.pubKey = bsv.PrivateKey.fromRandom().publicKey
 
-// test("invalid redeem balance", () => {
-//   const tx = buildTx(market)
-//   fundTx(tx, privateKey, address, utxos)
+  const resolvedMarket = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
+  resolvedMarket.status.decided = true
+  resolvedMarket.status.decision = 2
 
-//   const newTx = getRedeemTx(tx, entries, privateKey)
-//   fundTx(newTx, privateKey, address, utxos)
+  const tx = buildTx(resolvedMarket)
+  fundTx(tx, privateKey, address, utxos)
 
-//   const newEntry: entry = cloneDeep(entries[0])
-//   newEntry.balance.sharesFor = 0
-//   newEntry.balance.sharesAgainst = 0
+  const newBalance: balance = {
+    liquidity: 0,
+    shares: [1, 0, 2]
+  }
 
-//   const newEntries = [newEntry]
+  const newTx = getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
 
-//   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(false)
-// })
+  const newEntry: entry = cloneDeep(entry)
+  newEntry.balance = newBalance
 
-// test("verify signatures", () => {
-//   const decision = 1
-//   const sig1 = getSignature(decision, rabinPrivKey1)
-//   const sig2 = getSignature(decision, rabinPrivKey2)
+  const newEntries = [newEntry]
 
-//   const tx = buildTx(market)
-//   fundTx(tx, privateKey, address, utxos)
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
 
-//   const newTx = getDecideTx(tx, decision, [sig1, sig2])
-//   fundTx(newTx, privateKey, address, utxos)
+test("can't sell liquidity and redeem shares after market is resolved", () => {
+  const entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [1, 0, 2]
+    }
+  }
 
-//   expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
-// })
+  const localMarketCreator = cloneDeep(marketCreator)
+  localMarketCreator.pubKey = bsv.PrivateKey.fromRandom().publicKey
 
-// test("redeem balance", () => {
-//   const entriesWithBalance: entry[] = [
-//     {
-//       publicKey: privateKey.publicKey,
-//       balance: {
-//         liquidity: 1,
-//         sharesFor: 1,
-//         sharesAgainst: 0
-//       }
-//     }
-//   ]
+  const resolvedMarket = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
+  resolvedMarket.status.decided = true
+  resolvedMarket.status.decision = 2
 
-//   const resolvedMarket = cloneDeep(market)
-//   resolvedMarket.status = {
-//     decided: true,
-//     decision: 1
-//   }
-//   resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot(entriesWithBalance)
-//   resolvedMarket.balance = getMarketBalance(entriesWithBalance)
+  const tx = buildTx(resolvedMarket)
+  fundTx(tx, privateKey, address, utxos)
 
-//   const tx = buildTx(resolvedMarket)
-//   fundTx(tx, privateKey, address, utxos)
+  const newBalance: balance = {
+    liquidity: 0,
+    shares: [1, 0, 0]
+  }
 
-//   const newTx = getRedeemTx(tx, entriesWithBalance, privateKey)
-//   fundTx(newTx, privateKey, address, utxos)
+  const newTx = getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
 
-//   const newEntries = cloneDeep(entriesWithBalance)
-//   newEntries[0].balance.sharesFor = 0
+  const newEntry: entry = cloneDeep(entry)
+  newEntry.balance = newBalance
 
-//   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
-// })
-// // function getOracleSigs(oraclePrivKeys: rabinPrivKey[], vote: number): rabinSig[] {
-// //   return oraclePrivKeys.map(privKey => {
-// //     return getSignature(vote, privKey)
-// //   })
-// // }
+  const newEntries = [newEntry]
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(false)
+})
 
 // test("full market graph", () => {
 //   const entries: entry[] = [
