@@ -6,7 +6,6 @@ import {
   getOracleCommitTx,
   getUpdateMarketTx,
   getAddEntryTx,
-  getDecideTx,
   isValidMarketUpdateTx,
   getMarketFromScript,
   getOracleVoteTx
@@ -332,7 +331,36 @@ test("Two oracles vote and market resolve", () => {
   expect(isValidMarketUpdateTx(newTx2, newTx, entries)).toBe(true)
 })
 
-// test("redeem winning shares", () => {})
+test("redeem winning shares", () => {
+  const entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [1, 0, 2]
+    }
+  }
+
+  const resolvedMarket = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
+  resolvedMarket.status.decided = true
+  resolvedMarket.status.decision = 2
+
+  const tx = buildTx(resolvedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 2,
+    shares: [1, 0, 0]
+  }
+
+  const newTx = getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  const newEntry: entry = cloneDeep(entry)
+  newEntry.balance = newBalance
+
+  const newEntries = [newEntry]
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
 
 // test("sell liquidity after market is resolved", () => {})
 

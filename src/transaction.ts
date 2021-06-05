@@ -98,21 +98,6 @@ export function getUpdateMarketTx(
     })
   )
 
-  const prevBalance = prevTx.outputs[0].satoshis
-  const newBalance = tx.outputs[0].satoshis
-
-  // Add fee outputs to dev and creator
-  const redeemSats = prevBalance - newBalance
-  if (redeemSats > 0) {
-    const version = getMarketVersion(market.version)
-
-    const developerSatFee = Math.floor((version.devFee * redeemSats) / 100)
-    const creatorSatFee = Math.floor((market.creatorFee * redeemSats) / 100)
-
-    tx.to(bsv.Address.fromHex(developerPayoutAddress), developerSatFee)
-    tx.to(market.creator.payoutAddress, creatorSatFee)
-  }
-
   return tx
 }
 
@@ -326,7 +311,14 @@ export function getUpdateEntryTx(
 
   const newEntries = [...prevEntries]
   newEntries[entryIndex] = newEntry
+
   const newGlobalBalance = getMarketBalance(newEntries, optionCount)
+
+  if (prevMarket.status.decided && publicKey.toString() === prevMarket.creator.pubKey.toString()) {
+    // Redeem invalid shares
+    const onlyValidShares = newGlobalBalance.shares.map((shares, i) => (i === prevMarket.status.decision ? shares : 0))
+    newGlobalBalance.shares = onlyValidShares
+  }
 
   const merklePath = getMerklePath(prevEntries, entryIndex)
   const newMerklePath = getMerklePath(newEntries, entryIndex)
@@ -339,17 +331,34 @@ export function getUpdateEntryTx(
 
   const newTx = getUpdateMarketTx(prevTx, newMarket)
 
+  const prevGlobalSatBalance = prevTx.outputs[0].satoshis
+
+  // Determine redeem satoshis
+  let redeemSats = 0
   if (prevMarket.status.decided) {
     const decision = prevMarket.status.decision
     const winningShares = oldEntry.balance.shares[decision]
     const redeemed = winningShares - newEntry.balance.shares[decision]
 
-    // FIXME: market creator can redeem invalid tokens as well if resolved
-
-    if (redeemed) {
-      const redeemSats = redeemed * SatScaling
+    // market creator can redeem invalid transactions
+    if (redeemed !== 0) {
+      redeemSats = redeemed * SatScaling
       newTx.outputs[0].satoshis = prevTx.outputs[0].satoshis - redeemSats
     }
+  } else {
+    const newGlobalSatBalance = newTx.outputs[0].satoshis
+    redeemSats = prevGlobalSatBalance - newGlobalSatBalance
+  }
+
+  // Add fee outputs to dev and creator
+  if (redeemSats > 0) {
+    const version = getMarketVersion(prevMarket.version)
+
+    const developerSatFee = Math.floor((version.devFee * redeemSats) / 100)
+    const creatorSatFee = Math.floor((prevMarket.creatorFee * redeemSats) / 100)
+
+    newTx.to(bsv.Address.fromHex(developerPayoutAddress), developerSatFee)
+    newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
   }
 
   fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
@@ -612,74 +621,6 @@ export function getOracleVoteTx(
 
   // const asm = prevTx.outputs[0].script.toASM().split(" ")
   // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
-
-  return newTx
-}
-
-export function getDecideTx(
-  prevTx: bsv.Transaction,
-  result: 1 | 0,
-  rabinPrivKey: rabinPrivKey,
-  payoutAddress: bsv.Address,
-  utxos: bsv.Transaction.UnspentOutput[],
-  spendingPrivKey: bsv.PrivateKey
-): bsv.Transaction {
-  // TODO: Offer option to fund transaction separately?
-  const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
-  const token = getToken(prevMarket)
-
-  const rabinPubKey = privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
-
-  const oracleIndex = prevMarket.oracles.findIndex(oracle => oracle.pubKey === rabinPubKey)
-  const oracle = prevMarket.oracles[oracleIndex]
-
-  if (!oracle) throw new Error("Oracle not found.")
-
-  const newOracles = prevMarket.oracles
-  newOracles[oracleIndex] = {
-    ...oracle,
-    committed: true
-  }
-
-  const newMarket = {
-    ...prevMarket,
-    oracles: newOracles
-  }
-
-  const newTx = getUpdateMarketTx(prevTx, newMarket)
-
-  const sigContent = commitmentHash + prevTx.hash
-  const signature = getOracleSig(sigContent, rabinPrivKey)
-  const signatureBytes = int2Hex(signature.signature)
-
-  const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
-  const preimage = getPreimage(prevTx, newTx, sighashType)
-
-  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
-
-  const unlockingScript = token
-    .updateMarket(
-      new SigHashPreimage(preimage.toString("hex")),
-      3, // action = Update entry
-      new Bytes(""),
-      0,
-      new Bytes(""),
-      new Bytes(""),
-      new Bytes(""),
-      0,
-      new Bytes(""),
-      new Sig("00"),
-      new Bytes(""),
-      oracleIndex,
-      signature.signature,
-      signature.paddingByteCount,
-      0
-    )
-    .toScript() as bsv.Script
-
-  newTx.inputs[0].setScript(unlockingScript)
-
-  fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
 
   return newTx
 }
