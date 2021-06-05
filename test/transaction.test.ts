@@ -465,87 +465,167 @@ test("can't sell liquidity and redeem shares after market is resolved", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(false)
 })
 
-// test("full market graph", () => {
-//   const entries: entry[] = [
-//     {
-//       publicKey: privateKey.publicKey,
-//       balance: {
-//         liquidity: 1,
-//         sharesFor: 0,
-//         sharesAgainst: 0
-//       }
-//     }
-//   ]
+test("full market graph", () => {
+  // Create market
 
-//   const market = getNewMarket({ resolve: "test" }, entries, oracleDetails)
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+  expect(isValidMarketTx(tx, entries)).toBe(true)
 
-//   // Build init tx
-//   const tx1 = buildTx(market)
-//   fundTx(tx1, privateKey, address, utxos)
+  // Add entry
 
-//   expect(isValidMarketTx(tx1, entries)).toBe(true)
+  const privateKey2 = bsv.PrivateKey.fromString("L4wrW1PZktcohFrbuACjJVPnEZWnfm9tRbh6qoiVfy1dDPfkVVpC")
+  const publicKey2 = privateKey2.publicKey
 
-//   // Add new entry
-//   const newEntry: entry = {
-//     publicKey: privateKey.publicKey,
-//     balance: {
-//       liquidity: 0,
-//       sharesFor: 2,
-//       sharesAgainst: 0
-//     }
-//   }
+  const entry2: entry = {
+    publicKey: publicKey2,
+    balance: {
+      liquidity: 0,
+      shares: [0, 0, 2]
+    }
+  }
 
-//   const tx2 = getAddEntryTx(tx1, entries, newEntry)
-//   fundTx(tx2, privateKey, address, utxos)
+  const tx2 = getAddEntryTx(tx, entries, entry2, marketCreator.payoutAddress, utxos, privateKey)
 
-//   entries.push(newEntry)
+  const entries2 = entries.concat([entry2])
 
-//   expect(isValidMarketUpdateTx(tx2, tx1, entries)).toBe(true)
+  expect(isValidMarketUpdateTx(tx2, tx, entries2)).toBe(true)
 
-//   // Buy more shares
-//   const newBalance: balance = {
-//     liquidity: 1,
-//     sharesFor: 0,
-//     sharesAgainst: 1
-//   }
+  // Update entry - buy
 
-//   const tx3 = getUpdateEntryTx(tx2, entries, newBalance, privateKey)
-//   fundTx(tx3, privateKey, address, utxos)
+  const balance3: balance = {
+    liquidity: 2,
+    shares: [1, 2, 2]
+  }
 
-//   entries[0].balance.sharesAgainst = 1
+  const tx3 = getUpdateEntryTx(tx2, entries2, balance3, privateKey, marketCreator.payoutAddress, utxos, privateKey)
 
-//   expect(isValidMarketUpdateTx(tx3, tx2, entries)).toBe(true)
+  const entry3: entry = {
+    publicKey: privateKey.publicKey,
+    balance: balance3
+  }
 
-//   // Sell shares
-//   const newBalance2: balance = {
-//     liquidity: 1,
-//     sharesFor: 0,
-//     sharesAgainst: 0
-//   }
+  const entries3 = [entry3, entry2]
 
-//   const tx4 = getUpdateEntryTx(tx3, entries, newBalance2, privateKey)
-//   tx4.change(address)
+  expect(isValidMarketUpdateTx(tx3, tx2, entries3)).toBe(true)
 
-//   entries[0].balance.sharesAgainst = 0
+  // Change liquidity
 
-//   expect(isValidMarketUpdateTx(tx4, tx3, entries)).toBe(true)
+  const balance4: balance = {
+    liquidity: 3,
+    shares: [1, 2, 2]
+  }
 
-//   // Decide market
-//   const decision = 1
-//   const sig1 = getSignature(decision, rabinPrivKey1)
-//   const sig2 = getSignature(decision, rabinPrivKey2)
+  const tx4 = getUpdateEntryTx(tx3, entries3, balance4, privateKey, marketCreator.payoutAddress, utxos, privateKey)
 
-//   const tx5 = getDecideTx(tx4, decision, [sig1, sig2])
-//   fundTx(tx5, privateKey, address, utxos)
+  const entry4: entry = {
+    publicKey: privateKey.publicKey,
+    balance: balance4
+  }
 
-//   expect(isValidMarketUpdateTx(tx5, tx4, entries)).toBe(true)
+  const entries4 = [entry4, entry2]
 
-//   // Redeem balance
-//   const tx6 = getRedeemTx(tx5, entries, privateKey)
-//   tx6.change(address)
+  expect(isValidMarketUpdateTx(tx4, tx3, entries4)).toBe(true)
 
-//   entries[0].balance.sharesFor = 0
-//   entries[0].balance.sharesAgainst = 0
+  // Update entry - sell
 
-//   expect(isValidMarketUpdateTx(tx6, tx5, entries)).toBe(true)
-// })
+  const balance5: balance = {
+    liquidity: 3,
+    shares: [1, 0, 2]
+  }
+
+  const tx5 = getUpdateEntryTx(tx4, entries4, balance5, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  const entry5: entry = {
+    publicKey: privateKey.publicKey,
+    balance: balance5
+  }
+
+  const entries5 = [entry5, entry2]
+
+  expect(isValidMarketUpdateTx(tx5, tx4, entries5)).toBe(true)
+
+  // Oracle 1 commit
+
+  const tx6 = getOracleCommitTx(tx5, rabinPrivKey1, address, utxos, privateKey)
+
+  expect(isValidMarketUpdateTx(tx6, tx5, entries5)).toBe(true)
+
+  // Oracle 2 commit
+
+  const tx7 = getOracleCommitTx(tx6, rabinPrivKey2, address, utxos, privateKey)
+
+  expect(isValidMarketUpdateTx(tx7, tx6, entries5)).toBe(true)
+
+  // Oracle 1 vote
+
+  const vote = 2
+
+  const tx8 = getOracleVoteTx(tx7, vote, rabinPrivKey1, address, utxos, privateKey)
+
+  expect(isValidMarketUpdateTx(tx8, tx7, entries5)).toBe(true)
+
+  // Oracle 2 vote
+
+  const tx9 = getOracleVoteTx(tx8, vote, rabinPrivKey2, address, utxos, privateKey)
+
+  expect(isValidMarketUpdateTx(tx9, tx8, entries5)).toBe(true)
+
+  const market9 = getMarketFromScript(tx9.outputs[0].script)
+  expect(market9.status.decided).toBe(true)
+
+  // User 2 redeems winning shares
+
+  const balance10: balance = {
+    liquidity: 0,
+    shares: [0, 0, 0]
+  }
+
+  const tx10 = getUpdateEntryTx(tx9, entries5, balance10, privateKey2, marketCreator.payoutAddress, utxos, privateKey)
+
+  const entry10: entry = {
+    publicKey: publicKey2,
+    balance: balance10
+  }
+
+  const entries10 = [entry5, entry10]
+
+  expect(isValidMarketUpdateTx(tx10, tx9, entries10)).toBe(true)
+
+  // Market creator redeems winning shares
+
+  const balance11: balance = {
+    liquidity: 3,
+    shares: [1, 0, 0]
+  }
+
+  const tx11 = getUpdateEntryTx(tx10, entries10, balance11, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  const entry11: entry = {
+    publicKey: privateKey.publicKey,
+    balance: balance11
+  }
+
+  const entries11 = [entry11, entry10]
+
+  expect(isValidMarketUpdateTx(tx11, tx10, entries11)).toBe(true)
+
+  // Market creator redeems loosing shares and sells liquidity
+
+  const balance12: balance = {
+    liquidity: 0,
+    shares: [1, 0, 0]
+  }
+
+  const tx12 = getUpdateEntryTx(tx11, entries11, balance12, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  const entry12: entry = {
+    publicKey: privateKey.publicKey,
+    balance: balance12
+  }
+
+  const entries12 = [entry12, entry10]
+
+  expect(isValidMarketUpdateTx(tx12, tx11, entries12)).toBe(true)
+  expect(tx12.outputs[0].satoshis).toBe(546) // Only dust remains
+})
