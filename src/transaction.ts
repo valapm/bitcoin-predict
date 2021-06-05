@@ -314,10 +314,16 @@ export function getUpdateEntryTx(
 
   const newGlobalBalance = getMarketBalance(newEntries, optionCount)
 
-  if (prevMarket.status.decided && publicKey.toString() === prevMarket.creator.pubKey.toString()) {
+  let redeemInvalid = false
+  if (
+    prevMarket.status.decided &&
+    publicKey.toString() === prevMarket.creator.pubKey.toString() &&
+    oldEntry.balance.shares.join("") === newEntry.balance.shares.join("")
+  ) {
     // Redeem invalid shares
     const onlyValidShares = newGlobalBalance.shares.map((shares, i) => (i === prevMarket.status.decision ? shares : 0))
     newGlobalBalance.shares = onlyValidShares
+    redeemInvalid = true
   }
 
   const merklePath = getMerklePath(prevEntries, entryIndex)
@@ -335,7 +341,7 @@ export function getUpdateEntryTx(
 
   // Determine redeem satoshis
   let redeemSats = 0
-  if (prevMarket.status.decided) {
+  if (prevMarket.status.decided && !redeemInvalid) {
     const decision = prevMarket.status.decision
     const winningShares = oldEntry.balance.shares[decision]
     const redeemed = winningShares - newEntry.balance.shares[decision]

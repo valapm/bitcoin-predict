@@ -340,10 +340,12 @@ test("redeem winning shares", () => {
     }
   }
 
+  const localMarketCreator = cloneDeep(marketCreator)
+  localMarketCreator.pubKey = bsv.PrivateKey.fromRandom().publicKey
+
   const resolvedMarket = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
   resolvedMarket.status.decided = true
   resolvedMarket.status.decision = 2
-  resolvedMarket.creator.pubKey = bsv.PrivateKey.fromRandom().publicKey
 
   const tx = buildTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
@@ -363,7 +365,7 @@ test("redeem winning shares", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
-test("redeem winning and invalid shares", () => {
+test("redeem invalid shares", () => {
   const entry = {
     publicKey: privateKey.publicKey,
     balance: {
@@ -379,17 +381,9 @@ test("redeem winning and invalid shares", () => {
   const tx = buildTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
 
-  const newBalance: balance = {
-    liquidity: 2,
-    shares: [1, 0, 0]
-  }
+  const newTx = getUpdateEntryTx(tx, [entry], entry.balance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
 
-  const newTx = getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
-
-  const newEntry: entry = cloneDeep(entry)
-  newEntry.balance = newBalance
-
-  const newEntries = [newEntry]
+  const newEntries = [entry]
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
