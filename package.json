@@ -4,7 +4,7 @@
   "description": "",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
-  "browser": "./dist/bitcoin-predict.js",
+  "browser": "./dist/bitcoin-predict.mjs",
   "scripts": {
     "build": "npm run build:web && npm run build:node",
     "build:web": "webpack --config webpack.config.js",
@@ -26,6 +26,7 @@
     "eslint-config-prettier": "^6.15.0",
     "eslint-plugin-functional": "^3.2.1",
     "jest": "^26.5.3",
+    "node-polyfill-webpack-plugin": "^1.1.2",
     "os-browserify": "^0.3.0",
     "path-browserify": "^1.0.1",
     "prettier": "^2.3.1",

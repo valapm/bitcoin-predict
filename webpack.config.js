@@ -1,9 +1,10 @@
 const path = require("path")
 const webpack = require("webpack")
+const NodePolyfillPlugin = require("node-polyfill-webpack-plugin")
 
 module.exports = {
   entry: "./src/index.ts",
-  devtool: "inline-source-map",
+  devtool: "source-map",
   target: "web",
   mode: "production",
   module: {
@@ -30,13 +31,19 @@ module.exports = {
     }
   },
   output: {
-    filename: "bitcoin-predict.js",
+    filename: "bitcoin-predict.mjs",
     sourceMapFilename: "bitcoin-predict.map",
     path: path.resolve(__dirname, "dist"),
-    libraryTarget: "umd"
+    library: {
+      type: "module"
+    }
   },
   plugins: [
     // new webpack.IgnorePlugin({ resourceRegExp: /child_process$/ }),
-    new webpack.IgnorePlugin({ resourceRegExp: /predictionMarket.scrypt$/ })
-  ]
+    new webpack.IgnorePlugin({ resourceRegExp: /predictionMarket.scrypt$/ }),
+    new NodePolyfillPlugin()
+  ],
+  experiments: {
+    outputModule: true
+  }
 }
