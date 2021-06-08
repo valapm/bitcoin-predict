@@ -675,6 +675,11 @@ export function fundTx(
   return tx
 }
 
+export function getFunctionID(script: bsv.Script): number {
+  const asm = script.toASM().split(" ")
+  return getIntFromOP(asm[1])
+}
+
 // export function getDebugParams(tx: bsv.Transaction): string {
 //   function getBytes(asm: string): string {
 //     const bytes = asm === "0" ? "" : asm

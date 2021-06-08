@@ -8,8 +8,9 @@ import {
   getAddEntryTx,
   isValidMarketUpdateTx,
   getMarketFromScript,
-  getOracleVoteTx
-  // getDebugParams
+  getOracleVoteTx,
+  // getDebugParams,
+  getFunctionID
 } from "../src/transaction"
 import { privKeyToPubKey, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
@@ -628,4 +629,21 @@ test("full market graph", () => {
 
   expect(isValidMarketUpdateTx(tx12, tx11, entries12)).toBe(true)
   expect(tx12.outputs[0].satoshis).toBe(546) // Only dust remains
+})
+
+test("get function from script", () => {
+  const tx = buildTx(market)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newEntry: entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 0,
+      shares: [1, 0, 2]
+    }
+  }
+
+  const newTx = getAddEntryTx(tx, entries, newEntry, marketCreator.payoutAddress, utxos, privateKey)
+
+  expect(getFunctionID(newTx.inputs[0].script)).toBe(1)
 })
