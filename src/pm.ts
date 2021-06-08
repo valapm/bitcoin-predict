@@ -208,12 +208,31 @@ export function getEntryHex(entry: entry): string {
   return entry.publicKey.toString() + getBalanceHex(entry.balance)
 }
 
+export function getEntryFromHex(bytes: string): entry {
+  const publicKey = bsv.PublicKey.fromString(bytes.slice(0, 66))
+  return {
+    publicKey,
+    balance: getBalanceFromHex(bytes.slice(66))
+  }
+}
+
 export function getBalanceHex(balance: balance): string {
   return int2Hex(balance.liquidity, 1) + getSharesHex(balance.shares)
 }
 
+export function getBalanceFromHex(bytes: string): balance {
+  return {
+    liquidity: parseInt(bytes.slice(0, 2), 16),
+    shares: getSharesFromHex(bytes.slice(2))
+  }
+}
+
 export function getSharesHex(shares: number[]): string {
   return shares.reduce((bytes: string, n) => bytes + int2Hex(n, 1), "")
+}
+
+export function getSharesFromHex(bytes: string): number[] {
+  return hex2IntArray(bytes)
 }
 
 export function getBalanceHexLength(version: version, script: bsv.Script): number {
