@@ -346,3 +346,11 @@ export function getMinMarketSatBalance(market: marketInfo, entries: entry[]): nu
     return getLmsrSats(balance)
   }
 }
+
+export function isValidMarketInit(market: marketInfo): boolean {
+  return (
+    !market.status.decided &&
+    market.status.votes.reduce((a, b) => a + b, 0) === 0 &&
+    market.oracles.every(oracle => !oracle.committed && !oracle.voted)
+  )
+}
