@@ -58,12 +58,15 @@ interface PM extends AbstractContract {
   decide(txPreimage: Sig, result: number, oracleSigs: Bytes): FunctionCall
 }
 
+export type option = {
+  name: string
+  details?: string
+}
+
 export type marketDetails = {
   resolve: string
   details: string // Detailed Information about the market
-  options: {
-    length: number // globalOptionCount
-  }
+  options: option[]
 }
 
 export type marketStatus = {

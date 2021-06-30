@@ -102,9 +102,7 @@ beforeEach(() => {
   marketDetails = {
     resolve: "test",
     details: "Here are some details about this market",
-    options: {
-      length: 3
-    }
+    options: [{ name: "Outcome 1" }, { name: "Outcome 2" }, { name: "Outcome 3" }]
   }
 
   market = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
