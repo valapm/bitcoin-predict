@@ -40,5 +40,9 @@ export function getProbability(balance: balance, shares: number): number {
 }
 
 export function getLmsrSats(balance: balance): number {
+  return Math.floor(lmsr(balance) * SatScaling)
+}
+
+export function getLmsrSatsFixed(balance: balance): number {
   return Math.floor(lmsrFixed(balance) * SatScaling)
 }

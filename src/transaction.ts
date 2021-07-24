@@ -25,7 +25,7 @@ import {
   commitmentHash,
   getSignature as getOracleSig
 } from "./oracle"
-import { getLmsrSats, SatScaling, balance } from "./lmsr"
+import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
 import { getMerkleRootByPath } from "./merkleTree"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
@@ -72,7 +72,7 @@ const opReturnDataLength = 3
 export function buildTx(market: marketInfo): bsv.Transaction {
   const token = getToken(market)
 
-  const contractBalance = getLmsrSats(market.balance)
+  const contractBalance = getLmsrSatsFixed(market.balance)
 
   const tx = new bsv.Transaction()
   tx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis: contractBalance }))
@@ -205,7 +205,8 @@ export function getAddEntryTx(
   entry: entry,
   payoutAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[],
-  spendingPrivKey: bsv.PrivateKey
+  spendingPrivKey: bsv.PrivateKey,
+  feePerByte: number = feeb
 ): bsv.Transaction {
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
   const optionCount = prevMarket.details.options.length
@@ -224,7 +225,7 @@ export function getAddEntryTx(
 
   const newTx = getUpdateMarketTx(prevTx, newMarket)
 
-  fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
+  fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID
 
@@ -293,7 +294,8 @@ export function getUpdateEntryTx(
   privateKey: bsv.PrivateKey,
   payoutAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[],
-  spendingPrivKey: bsv.PrivateKey
+  spendingPrivKey: bsv.PrivateKey,
+  feePerByte: number = feeb
 ): bsv.Transaction {
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
   const optionCount = prevMarket.details.options.length
@@ -367,7 +369,7 @@ export function getUpdateEntryTx(
     newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
   }
 
-  fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
+  fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID
 
@@ -436,7 +438,8 @@ export function getOracleCommitTx(
   rabinPrivKey: rabinPrivKey,
   payoutAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[],
-  spendingPrivKey: bsv.PrivateKey
+  spendingPrivKey: bsv.PrivateKey,
+  feePerByte: number = feeb
 ): bsv.Transaction {
   // TODO: Offer option to fund transaction separately?
 
@@ -512,7 +515,7 @@ export function getOracleCommitTx(
 
   newTx.inputs[0].setScript(unlockingScript)
 
-  fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
+  fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
 
   // console.log(newTx.toString())
   // console.log(prevTx.outputs[0].satoshis)
@@ -529,7 +532,8 @@ export function getOracleVoteTx(
   rabinPrivKey: rabinPrivKey,
   payoutAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[],
-  spendingPrivKey: bsv.PrivateKey
+  spendingPrivKey: bsv.PrivateKey,
+  feePerByte: number = feeb
 ): bsv.Transaction {
   // TODO: Offer option to fund transaction separately?
 
@@ -620,7 +624,7 @@ export function getOracleVoteTx(
 
   newTx.inputs[0].setScript(unlockingScript)
 
-  fundTx(newTx, spendingPrivKey, payoutAddress, utxos)
+  fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
 
   // console.log(newTx.toString())
   // console.log(prevTx.outputs[0].satoshis)
@@ -646,7 +650,8 @@ export function fundTx(
   tx: bsv.Transaction,
   privateKey: bsv.PrivateKey,
   changeAddress: bsv.Address,
-  utxos: bsv.Transaction.UnspentOutput[]
+  utxos: bsv.Transaction.UnspentOutput[],
+  satPerByte: number = feeb
 ): bsv.Transaction {
   const inputCount = tx.inputs.length
 
@@ -656,6 +661,8 @@ export function fundTx(
   if (marketOutput.satoshis < dustLimit) {
     marketOutput.satoshis = dustLimit
   }
+
+  tx.feePerKb(satPerByte * 1000)
 
   tx.change(changeAddress)
 

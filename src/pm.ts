@@ -3,7 +3,7 @@ import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
 import { int2Hex, toHex, fromHex, hex2IntArray, splitHexByNumber, reverseHex } from "./hex"
 import { isHash, hash, sha256 } from "./sha"
 import { oracleDetail, getOracleDetailsHex, isValidOracleDetails, getOracleStatesHex } from "./oracle"
-import { getLmsrSats, SatScaling, balance } from "./lmsr"
+import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
 import { ContractDescription, AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
 
@@ -346,7 +346,7 @@ export function getMinMarketSatBalance(market: marketInfo, entries: entry[]): nu
     const shares = balance.shares[market.status.decision]
     return shares * SatScaling
   } else {
-    return getLmsrSats(balance)
+    return getLmsrSatsFixed(balance)
   }
 }
 
