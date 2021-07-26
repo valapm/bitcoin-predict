@@ -188,13 +188,12 @@ export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean 
   const market = getMarketFromScript(script)
 
   const hasValidSatBalance = getMinMarketSatBalance(market, entries) <= balance
-  const hasValidMarketBalance = market.status.decided ? true : validateEntries(market, entries)
 
   return (
     tx.verify() === true &&
     !tx.getSerializationError() &&
     isValidMarketInfo(market) &&
-    hasValidMarketBalance &&
+    validateEntries(market, entries) &&
     hasValidSatBalance
   )
 }

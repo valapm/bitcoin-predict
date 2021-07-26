@@ -328,11 +328,20 @@ export function isValidMarketInfo(market: marketInfo): boolean {
 
 export function validateEntries(market: marketInfo, entries: entry[]): boolean {
   const optionCount = market.details.options.length
-  const calculatedBalance = getMarketBalance(entries, optionCount)
-  return (
-    market.balance.liquidity === calculatedBalance.liquidity &&
-    market.balance.shares.every((n, i) => n === calculatedBalance.shares[i])
-  )
+
+  let hasCorrectBalance
+  if (market.status.decided) {
+    // When market is resolved global balance is detached so owner can redeem loosing shares.
+    // TODO: Should probably be changed.
+    hasCorrectBalance = true
+  } else {
+    const calculatedBalance = getMarketBalance(entries, optionCount)
+    hasCorrectBalance =
+      market.balance.liquidity === calculatedBalance.liquidity &&
+      market.balance.shares.every((n, i) => n === calculatedBalance.shares[i])
+  }
+
+  return hasCorrectBalance && market.balanceMerkleRoot === getBalanceMerkleRoot(entries)
 }
 
 export function getMinMarketSatBalance(market: marketInfo, entries: entry[]): number {
