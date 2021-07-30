@@ -349,9 +349,18 @@ test("redeem winning shares", () => {
   }
 
   const localMarketCreator = cloneDeep(marketCreator)
-  localMarketCreator.pubKey = bsv.PrivateKey.fromRandom().publicKey
+  localMarketCreator.pubKey = bsv.PrivateKey.fromString(
+    "L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm"
+  ).publicKey
 
-  const resolvedMarket = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
+  const resolvedMarket = getNewMarket(
+    marketDetails,
+    entry,
+    oracleDetails,
+    localMarketCreator,
+    creatorFee,
+    requiredVotes
+  )
   resolvedMarket.status.decided = true
   resolvedMarket.status.decision = 2
 
@@ -406,9 +415,18 @@ test("sell liquidity after market is resolved", () => {
   }
 
   const localMarketCreator = cloneDeep(marketCreator)
-  localMarketCreator.pubKey = bsv.PrivateKey.fromRandom().publicKey
+  localMarketCreator.pubKey = bsv.PrivateKey.fromString(
+    "L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm"
+  ).publicKey
 
-  const resolvedMarket = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
+  const resolvedMarket = getNewMarket(
+    marketDetails,
+    entry,
+    oracleDetails,
+    localMarketCreator,
+    creatorFee,
+    requiredVotes
+  )
   resolvedMarket.status.decided = true
   resolvedMarket.status.decision = 2
 
@@ -440,9 +458,18 @@ test("can't sell liquidity and redeem shares after market is resolved", () => {
   }
 
   const localMarketCreator = cloneDeep(marketCreator)
-  localMarketCreator.pubKey = bsv.PrivateKey.fromRandom().publicKey
+  localMarketCreator.pubKey = bsv.PrivateKey.fromString(
+    "L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm"
+  ).publicKey
 
-  const resolvedMarket = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
+  const resolvedMarket = getNewMarket(
+    marketDetails,
+    entry,
+    oracleDetails,
+    localMarketCreator,
+    creatorFee,
+    requiredVotes
+  )
   resolvedMarket.status.decided = true
   resolvedMarket.status.decision = 2
 

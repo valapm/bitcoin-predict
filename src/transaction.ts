@@ -351,6 +351,9 @@ export function getUpdateEntryTx(
     if (redeemed !== 0) {
       redeemSats = redeemed * SatScaling
       newTx.outputs[0].satoshis = prevTx.outputs[0].satoshis - redeemSats
+    } else {
+      const newGlobalSatBalance = newTx.outputs[0].satoshis
+      redeemSats = prevGlobalSatBalance - newGlobalSatBalance
     }
   } else {
     const newGlobalSatBalance = newTx.outputs[0].satoshis

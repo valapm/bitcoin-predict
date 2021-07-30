@@ -181,9 +181,9 @@ export function getToken(market: marketInfo): PM {
   // console.log([
   //   new Bytes(getOracleDetailsHex(market.oracles)).toLiteral(), // oracleKeys
   //   market.details.options.length, // globalOptionCount
-  //   1, // requiredVotes,
+  //   market.requiredVotes, // requiredVotes,
   //   new PubKey(market.creator.pubKey.toHex()).toLiteral(),
-  //   new Ripemd160(market.creator.payoutAddress.toHex()).toLiteral(),
+  //   new Ripemd160(market.creator.payoutAddress.hashBuffer.toString("hex")).toLiteral(),
   //   market.creatorFee
   // ])
 
