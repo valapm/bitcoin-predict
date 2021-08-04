@@ -54,8 +54,6 @@ interface PM extends AbstractContract {
     paddingCount: number,
     oracleDecision: number
   ): FunctionCall
-
-  decide(txPreimage: Sig, result: number, oracleSigs: Bytes): FunctionCall
 }
 
 export type option = {

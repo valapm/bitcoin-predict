@@ -23,14 +23,15 @@ import {
   oracleInfoByteLength,
   oracleStateByteLength,
   commitmentHash,
-  getSignature as getOracleSig
+  getSignature as getOracleSig,
+  getBurnToken
 } from "./oracle"
 import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
 import { getMerkleRootByPath } from "./merkleTree"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
-import { rabinPrivKey, privKeyToPubKey } from "rabinsig"
-import { hex2IntArray, int2Hex, getIntFromOP, reverseHex } from "./hex"
+import { rabinPrivKey, privKeyToPubKey, rabinPubKey } from "rabinsig"
+import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt } from "./hex"
 
 const feeb = 0.5
 
@@ -715,3 +716,42 @@ export function getFunctionID(script: bsv.Script): number {
 //   ]
 //   return JSON.stringify(tokenParams)
 // }
+
+export function buildOracleBurnTx(pubKey: rabinPubKey, burnSats: number): bsv.Transaction {
+  const token = getBurnToken(pubKey)
+
+  const tx = new bsv.Transaction()
+  tx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis: burnSats }))
+
+  tx.feePerKb(feeb * 1000)
+
+  return tx
+}
+
+export function getOracleBurnUpdateTx(prevTx: bsv.Transaction, burnSats: number): bsv.Transaction {
+  const pubKeyHex = prevTx.outputs[0].script.toASM().split(" ")[3]
+  const pubKey = hex2BigInt(pubKeyHex)
+
+  const newTx = buildOracleBurnTx(pubKey, prevTx.outputs[0].satoshis + burnSats)
+
+  newTx.addInput(
+    bsv.Transaction.Input.fromObject({
+      prevTxId: prevTx.hash,
+      outputIndex: 0,
+      script: bsv.Script.empty(),
+      output: prevTx.outputs[0] // prevTx of newTx here?
+    })
+  )
+
+  const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
+  const preimage = getPreimage(prevTx, newTx, sighashType)
+
+  const token = getBurnToken(pubKey)
+  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
+
+  const unlockingScript = token.burn(new SigHashPreimage(preimage.toString("hex")), burnSats).toScript() as bsv.Script
+
+  newTx.inputs[0].setScript(unlockingScript)
+
+  return newTx
+}

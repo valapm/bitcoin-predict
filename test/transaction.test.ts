@@ -10,7 +10,9 @@ import {
   getMarketFromScript,
   getOracleVoteTx,
   // getDebugParams,
-  getFunctionID
+  getFunctionID,
+  buildOracleBurnTx,
+  getOracleBurnUpdateTx
 } from "../src/transaction"
 import { privKeyToPubKey, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
@@ -671,4 +673,22 @@ test("get function from script", () => {
   const newTx = getAddEntryTx(tx, entries, newEntry, marketCreator.payoutAddress, utxos, privateKey)
 
   expect(getFunctionID(newTx.inputs[0].script)).toBe(1)
+})
+
+test("build and fund oracle burn transaction", () => {
+  const tx = buildOracleBurnTx(rabinPubKey1, 1000)
+  fundTx(tx, privateKey, address, utxos)
+  expect(tx.verify() === true && !tx.getSerializationError()).toBe(true)
+})
+
+test("build and fund oracle burn update transaction", () => {
+  const tx = buildOracleBurnTx(rabinPubKey1, 1000)
+  fundTx(tx, privateKey, address, utxos)
+
+  const tx2 = getOracleBurnUpdateTx(tx, 1000)
+  fundTx(tx2, privateKey, address, utxos)
+
+  expect(tx2.outputs[0].satoshis).toBe(2000)
+
+  expect(tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
 })

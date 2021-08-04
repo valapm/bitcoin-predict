@@ -1,10 +1,15 @@
 import { privKeyToPubKey, sign, rabinSig, rabinPrivKey, rabinPubKey } from "rabinsig"
+import { buildContractClass, SigHashPreimage } from "scryptlib"
+import { AbstractContract } from "scryptlib/dist/contract"
+import { FunctionCall } from "scryptlib/dist/abi"
 
 import { int2Hex, hex2BigInt, hex2Bool, bool2Hex, splitHexByNumber } from "./hex"
 import { num2bin } from "scryptlib"
 
 export type oracleDetail = { pubKey: rabinPubKey; votes: number; committed?: boolean; voted?: boolean }
 // export type oracleState = {}
+
+export const burnContractAddress = "9a17d95eb19ac3c8766d694591cfd4cf"
 
 export const rabinKeyByteLength = 126
 export const oracleInfoByteLength = rabinKeyByteLength + 1
@@ -37,7 +42,7 @@ export function getOracleStatesHex(oracleDetails: oracleDetail[]): string {
   return oracleDetails.map(getOracleStateHex).join("")
 }
 
-function getOraclePubKeyFromHex(hex: string): bigint {
+export function getOraclePubKeyFromHex(hex: string): bigint {
   const pubKeyHex = hex.slice(0, hex.length - 2)
   return hex2BigInt(pubKeyHex)
 }
@@ -89,4 +94,16 @@ export function getOracleSigsString(oracleSigs: rabinSig[]): string {
 export function getSignature(message: string, privKey: rabinPrivKey): rabinSig {
   const pubKey = privKeyToPubKey(privKey.p, privKey.q)
   return sign(message, privKey.p, privKey.q, pubKey)
+}
+
+interface burnContract extends AbstractContract {
+  burn(preimage: SigHashPreimage, burnSats: number): FunctionCall
+}
+
+export function getBurnToken(pubKey: rabinPubKey): burnContract {
+  const Token = buildContractClass(require(`../scripts/${burnContractAddress}.json`)) // eslint-disable-line
+
+  const token = new Token(pubKey) as burnContract // eslint-disable-line
+
+  return token
 }
