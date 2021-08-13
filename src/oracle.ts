@@ -1,4 +1,4 @@
-import { privKeyToPubKey, sign, rabinSig, rabinPrivKey, rabinPubKey } from "rabinsig"
+import { RabinSignature, rabinSig, rabinPrivKey, rabinPubKey } from "rabinsig"
 import { buildContractClass, SigHashPreimage } from "scryptlib"
 import { AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
@@ -92,8 +92,10 @@ export function getOracleSigsString(oracleSigs: rabinSig[]): string {
  * @param privKey
  */
 export function getSignature(message: string, privKey: rabinPrivKey): rabinSig {
-  const pubKey = privKeyToPubKey(privKey.p, privKey.q)
-  return sign(message, privKey.p, privKey.q, pubKey)
+  const rabin = new RabinSignature()
+
+  const pubKey = rabin.privKeyToPubKey(privKey.p, privKey.q)
+  return rabin.sign(message, privKey.p, privKey.q, pubKey)
 }
 
 interface burnContract extends AbstractContract {

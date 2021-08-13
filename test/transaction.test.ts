@@ -14,7 +14,7 @@ import {
   buildOracleBurnTx,
   getOracleBurnUpdateTx
 } from "../src/transaction"
-import { privKeyToPubKey, rabinPrivKey, rabinPubKey } from "rabinsig"
+import { RabinSignature, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
   entry,
   getMarketBalance,
@@ -29,6 +29,8 @@ import { bsv } from "scryptlib"
 import { getSignature, oracleDetail } from "../src/oracle"
 import { cloneDeep } from "lodash"
 
+const rabin = new RabinSignature()
+
 const rabinPrivKey1: rabinPrivKey = {
   p: 3097117482495218740761570398276008894011381249145414887346233174147008460690669803628686127894575795412733149071918669075694907431747167762627687052467n,
   q: 650047001204168007801848889418948532353073326909497585177081016045346562912146630794965372241635285465610094863279373295872825824127728241709483771067n
@@ -39,8 +41,8 @@ const rabinPrivKey2: rabinPrivKey = {
   q: 650047001204168007801848889418948532353073326909497585177081016045346562912146630794965372241635285465610094863279373295872825824127728241709483771067n
 }
 
-const rabinPubKey1: rabinPubKey = privKeyToPubKey(rabinPrivKey1.p, rabinPrivKey1.q)
-const rabinPubKey2: rabinPubKey = privKeyToPubKey(rabinPrivKey2.p, rabinPrivKey2.q)
+const rabinPubKey1: rabinPubKey = rabin.privKeyToPubKey(rabinPrivKey1.p, rabinPrivKey1.q)
+const rabinPubKey2: rabinPubKey = rabin.privKeyToPubKey(rabinPrivKey2.p, rabinPrivKey2.q)
 
 const creatorFee = 1
 

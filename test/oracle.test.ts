@@ -5,15 +5,15 @@ import {
   getSignature,
   getOracleStatesHex
 } from "../src/oracle"
-import { generatePrivKey, privKeyToPubKey } from "rabinsig"
+import { RabinSignature } from "rabinsig"
 
-const { verify } = require("rabinsig") // Why doesn't import work for verify ???
+const rabin = new RabinSignature()
 
-const privKey1 = generatePrivKey()
-const privKey2 = generatePrivKey()
+const privKey1 = rabin.generatePrivKey()
+const privKey2 = rabin.generatePrivKey()
 
-const pubKey1 = privKeyToPubKey(privKey1.p, privKey1.q)
-const pubKey2 = privKeyToPubKey(privKey2.p, privKey2.q)
+const pubKey1 = rabin.privKeyToPubKey(privKey1.p, privKey1.q)
+const pubKey2 = rabin.privKeyToPubKey(privKey2.p, privKey2.q)
 
 const oracleDetails: oracleDetail[] = [
   { pubKey: pubKey1, votes: 40, committed: false, voted: false },
@@ -39,5 +39,5 @@ test("should produce valid signature", () => {
 
   const signature = getSignature(contentHex, privKey1)
 
-  expect(verify(contentHex, signature.paddingByteCount, signature.signature, pubKey1)).toBe(true)
+  expect(rabin.verify(contentHex, signature.paddingByteCount, signature.signature, pubKey1)).toBe(true)
 })

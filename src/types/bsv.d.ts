@@ -114,6 +114,7 @@ declare module "bsv" {
 
       setScript(script: Script): Input
       isValidSignature(tx: Transaction, sig: any): boolean
+      isFullySigned(): boolean
 
       getSignatures(
         transaction: Transaction,
@@ -122,6 +123,7 @@ declare module "bsv" {
         sigtype?: number
       ): crypto.Signature[]
       addSignature(transaction: Transaction, signature: crypto.Signature): Input
+      clearSignatures(): void
     }
   }
 
@@ -384,11 +386,14 @@ declare module "bsv" {
     }
 
     function Interpreter(): {
+      errstr: string
+      stack: any[]
+
       verify: (
         inputScript: Script,
         outputScript: Script,
         txn: Transaction,
-        nin?: Number,
+        nin?: number,
         flags?: any,
         satoshisBN?: crypto.BN
       ) => boolean

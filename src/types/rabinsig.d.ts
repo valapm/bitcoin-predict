@@ -11,7 +11,10 @@ declare module "rabinsig" {
     paddingByteCount: number
   }
 
-  export function generatePrivKey(): rabinPrivKey
-  export function privKeyToPubKey(p: bigint, q: bigint): rabinPubKey
-  export function sign(value: string, p: bigint, q: bigint, pubKey: rabinPubKey): rabinSig
+  export class RabinSignature {
+    generatePrivKey(): rabinPrivKey
+    privKeyToPubKey(p: bigint, q: bigint): rabinPubKey
+    sign(value: string, p: bigint, q: bigint, pubKey: rabinPubKey): rabinSig
+    verify(dataHex: string, paddingByteCount: number, signature: bigint, nRabin: bigint): boolean
+  }
 }

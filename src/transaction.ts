@@ -30,7 +30,7 @@ import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
 import { getMerkleRootByPath } from "./merkleTree"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
-import { rabinPrivKey, privKeyToPubKey, rabinPubKey } from "rabinsig"
+import { rabinPrivKey, RabinSignature, rabinPubKey } from "rabinsig"
 import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt } from "./hex"
 
 const feeb = 0.5
@@ -90,14 +90,17 @@ export function getUpdateMarketTx(
 ): bsv.Transaction {
   const tx = buildTx(market)
 
-  tx.addInput(
-    bsv.Transaction.Input.fromObject({
-      prevTxId: prevTx.hash,
-      outputIndex: 0,
-      script: unlockingScript,
-      output: prevTx.outputs[0] // prevTx of newTx here?
-    })
-  )
+  const input = bsv.Transaction.Input.fromObject({
+    prevTxId: prevTx.hash,
+    outputIndex: 0,
+    script: unlockingScript,
+    output: prevTx.outputs[0] // prevTx of newTx here?
+  })
+
+  input.clearSignatures = () => {}
+  input.isFullySigned = () => true
+
+  tx.addInput(input)
 
   return tx
 }
@@ -177,6 +180,9 @@ export function isValidMarketUpdateTx(tx: bsv.Transaction, prevTx: bsv.Transacti
   const lockingScript = prevTx.outputs[0].script
   const unlockingScript = tx.inputs[0].script
   const interpreter = bsv.Script.Interpreter()
+  // console.log(interpreter.verify(unlockingScript, lockingScript, tx, 0, DEFAULT_FLAGS, prevTx.outputs[0].satoshisBN))
+  // console.log(interpreter.errstr)
+  // console.log(interpreter.stack.slice(interpreter.stack.length - 3, interpreter.stack.length))
   return (
     interpreter.verify(unlockingScript, lockingScript, tx, 0, DEFAULT_FLAGS, prevTx.outputs[0].satoshisBN) &&
     isValidMarketTx(tx, entries)
@@ -189,6 +195,14 @@ export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean 
   const market = getMarketFromScript(script)
 
   const hasValidSatBalance = getMinMarketSatBalance(market, entries) <= balance
+
+  // console.log([
+  //   tx.verify() === true,
+  //   !tx.getSerializationError(),
+  //   isValidMarketInfo(market),
+  //   validateEntries(market, entries),
+  //   hasValidSatBalance
+  // ])
 
   return (
     tx.verify() === true &&
@@ -258,8 +272,10 @@ export function getAddEntryTx(
     )
     .toScript() as bsv.Script
 
+  // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
+
   // console.log([
-  //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
+  //   // new SigHashPreimage(preimage.toString("hex")).toLiteral(),
   //   1, // action = Add entry
   //   new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
   //   changeSats,
@@ -449,7 +465,8 @@ export function getOracleCommitTx(
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
   const token = getToken(prevMarket)
 
-  const rabinPubKey = privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
+  const rabin = new RabinSignature()
+  const rabinPubKey = rabin.privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
 
   const oracleIndex = prevMarket.oracles.findIndex(oracle => oracle.pubKey === rabinPubKey)
   const oracle = prevMarket.oracles[oracleIndex]
@@ -543,7 +560,8 @@ export function getOracleVoteTx(
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
   const token = getToken(prevMarket)
 
-  const rabinPubKey = privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
+  const rabin = new RabinSignature()
+  const rabinPubKey = rabin.privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
 
   const oracleIndex = prevMarket.oracles.findIndex(oracle => oracle.pubKey === rabinPubKey)
   const oracle = prevMarket.oracles[oracleIndex]
@@ -734,14 +752,17 @@ export function getOracleBurnUpdateTx(prevTx: bsv.Transaction, burnSats: number)
 
   const newTx = buildOracleBurnTx(pubKey, prevTx.outputs[0].satoshis + burnSats)
 
-  newTx.addInput(
-    bsv.Transaction.Input.fromObject({
-      prevTxId: prevTx.hash,
-      outputIndex: 0,
-      script: bsv.Script.empty(),
-      output: prevTx.outputs[0] // prevTx of newTx here?
-    })
-  )
+  const input = bsv.Transaction.Input.fromObject({
+    prevTxId: prevTx.hash,
+    outputIndex: 0,
+    script: bsv.Script.empty(),
+    output: prevTx.outputs[0] // prevTx of newTx here?
+  })
+
+  input.clearSignatures = () => {}
+  input.isFullySigned = () => true
+
+  newTx.addInput(input)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
   const preimage = getPreimage(prevTx, newTx, sighashType)
