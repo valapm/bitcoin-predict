@@ -20,9 +20,11 @@ module.exports = {
     fallback: {
       crypto: require.resolve("crypto-browserify"),
       path: require.resolve("path-browserify"),
-      // fs: require.resolve("browserfs"),
       os: require.resolve("os-browserify/browser"),
-      stream: require.resolve("stream-browserify")
+      stream: require.resolve("stream-browserify"),
+      buffer: require.resolve("buffer"),
+      url: require.resolve("url"),
+      assert: require.resolve("assert")
     },
     alias: {
       child_process: path.resolve(__dirname, "mock/mock_module.js"),
