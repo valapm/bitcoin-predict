@@ -31,6 +31,10 @@ export function lmsrFixed(balance: balance): number {
 }
 
 export function getProbability(balance: balance, shares: number): number {
+  if (balance.liquidity === 0) {
+    return shares / balance.shares.reduce((a, b) => a + b)
+  }
+
   const expSum = balance.shares
     .map(share => share / balance.liquidity)
     .map(Math.exp)
