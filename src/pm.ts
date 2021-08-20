@@ -9,6 +9,7 @@ import { FunctionCall } from "scryptlib/dist/abi"
 
 export type version = {
   identifier: string
+  version: string
   oracleKeyPos: number
   globalOptionCountPos: number
   requiredVotesPos: number
@@ -24,6 +25,7 @@ export type version = {
 export const versions: version[] = [
   {
     identifier: "875142f650f13392c0bc8623ef70fe05",
+    version: "0.2.1",
     oracleKeyPos: 14,
     globalOptionCountPos: 15,
     requiredVotesPos: 16,
@@ -36,6 +38,7 @@ export const versions: version[] = [
   },
   {
     identifier: "4d46e634d1f57470289d5891efbf4d2f",
+    version: "0.2.0",
     oracleKeyPos: 14,
     globalOptionCountPos: 15,
     requiredVotesPos: 16,
