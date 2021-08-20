@@ -330,18 +330,38 @@ export function getUpdateEntryTx(
   const newEntries = [...prevEntries]
   newEntries[entryIndex] = newEntry
 
-  const newGlobalBalance = getMarketBalance(newEntries, optionCount)
-
+  let newGlobalBalance: balance
   let redeemInvalid = false
-  if (
-    prevMarket.status.decided &&
-    publicKey.toString() === prevMarket.creator.pubKey.toString() &&
-    oldEntry.balance.shares.join("") === newEntry.balance.shares.join("")
-  ) {
-    // Redeem invalid shares
-    const onlyValidShares = newGlobalBalance.shares.map((shares, i) => (i === prevMarket.status.decision ? shares : 0))
-    newGlobalBalance.shares = onlyValidShares
-    redeemInvalid = true
+  if (prevMarket.status.decided) {
+    const decision = prevMarket.status.decision
+    const winningShares = oldEntry.balance.shares[decision]
+    const redeemed = winningShares - newEntry.balance.shares[decision]
+
+    if (redeemed !== 0) {
+      // Redeem winning shares
+
+      if (!newEntry.balance.shares.every((newShares, index) => index === decision || newShares === 0))
+        throw new Error("Loosing shares must be set to 0")
+
+      newGlobalBalance = {
+        liquidity: prevMarket.balance.liquidity,
+        shares: prevMarket.balance.shares.map((shares, index) => (index === decision ? shares - redeemed : shares))
+      }
+    } else if (publicKey.toString() === prevMarket.creator.pubKey.toString()) {
+      // Redeem invalid shares
+
+      newGlobalBalance = getMarketBalance(newEntries, optionCount)
+      const onlyValidShares = newGlobalBalance.shares.map((shares, i) =>
+        i === prevMarket.status.decision ? shares : 0
+      )
+      newGlobalBalance.shares = onlyValidShares
+      redeemInvalid = true
+    } else {
+      newGlobalBalance = getMarketBalance(newEntries, optionCount)
+      newGlobalBalance.shares = prevMarket.balance.shares
+    }
+  } else {
+    newGlobalBalance = getMarketBalance(newEntries, optionCount)
   }
 
   const merklePath = getMerklePath(prevEntries, entryIndex)
@@ -423,8 +443,10 @@ export function getUpdateEntryTx(
     )
     .toScript() as bsv.Script
 
+  // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
+
   // console.log([
-  //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
+  //   // new SigHashPreimage(preimage.toString("hex")).toLiteral(),
   //   2, // action = Update entry
   //   new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
   //   changeSats,

@@ -373,7 +373,7 @@ test("redeem winning shares", () => {
 
   const newBalance: balance = {
     liquidity: 2,
-    shares: [1, 0, 0]
+    shares: [0, 0, 0]
   }
 
   const newTx = getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
@@ -402,9 +402,17 @@ test("redeem invalid shares", () => {
   const tx = buildTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
 
-  const newTx = getUpdateEntryTx(tx, [entry], entry.balance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+  const newBalance: balance = {
+    liquidity: 2,
+    shares: [0, 0, 2]
+  }
 
-  const newEntries = [entry]
+  const newTx = getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  const newEntry: entry = cloneDeep(entry)
+  newEntry.balance = newBalance
+
+  const newEntries = [newEntry]
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
@@ -439,7 +447,38 @@ test("sell liquidity after market is resolved", () => {
 
   const newBalance: balance = {
     liquidity: 0,
-    shares: [1, 0, 2]
+    shares: [0, 0, 2]
+  }
+
+  const newTx = getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  const newEntry: entry = cloneDeep(entry)
+  newEntry.balance = newBalance
+
+  const newEntries = [newEntry]
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+test("Market creator can sell liquidity after market is resolved", () => {
+  const entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [1, 0, 2]
+    }
+  }
+
+  const resolvedMarket = getNewMarket(marketDetails, entry, oracleDetails, marketCreator, creatorFee, requiredVotes)
+  resolvedMarket.status.decided = true
+  resolvedMarket.status.decision = 2
+
+  const tx = buildTx(resolvedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 0,
+    shares: [0, 0, 2]
   }
 
   const newTx = getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
@@ -485,6 +524,57 @@ test("can't sell liquidity and redeem shares after market is resolved", () => {
     shares: [1, 0, 0]
   }
 
+  const getNewTx = () =>
+    getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
+
+  expect(getNewTx).toThrow()
+
+  // const newEntry: entry = cloneDeep(entry)
+  // newEntry.balance = newBalance
+
+  // const newEntries = [newEntry]
+
+  // expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(false)
+})
+
+test("Redeem winning shares after loosing shares", () => {
+  const entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 0,
+      shares: [1, 1, 1]
+    }
+  }
+
+  // const localMarketCreator = cloneDeep(marketCreator)
+  // localMarketCreator.pubKey = bsv.PrivateKey.fromString(
+  //   "L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm"
+  // ).publicKey
+
+  const resolvedMarket = getNewMarket(
+    marketDetails,
+    entry,
+    oracleDetails,
+    marketCreator,
+    // localMarketCreator,
+    creatorFee,
+    requiredVotes
+  )
+  resolvedMarket.status.decided = true
+  resolvedMarket.status.decision = 0
+  resolvedMarket.balance = {
+    liquidity: 0,
+    shares: [1, 0, 0]
+  }
+
+  const tx = buildTx(resolvedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 0,
+    shares: [0, 0, 0]
+  }
+
   const newTx = getUpdateEntryTx(tx, [entry], newBalance, privateKey, marketCreator.payoutAddress, utxos, privateKey)
 
   const newEntry: entry = cloneDeep(entry)
@@ -492,7 +582,7 @@ test("can't sell liquidity and redeem shares after market is resolved", () => {
 
   const newEntries = [newEntry]
 
-  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(false)
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
 test("full market graph", () => {
@@ -626,7 +716,7 @@ test("full market graph", () => {
 
   const balance11: balance = {
     liquidity: 3,
-    shares: [1, 0, 0]
+    shares: [0, 0, 0]
   }
 
   const tx11 = getUpdateEntryTx(tx10, entries10, balance11, privateKey, marketCreator.payoutAddress, utxos, privateKey)
@@ -644,7 +734,7 @@ test("full market graph", () => {
 
   const balance12: balance = {
     liquidity: 0,
-    shares: [1, 0, 0]
+    shares: [0, 0, 0]
   }
 
   const tx12 = getUpdateEntryTx(tx11, entries11, balance12, privateKey, marketCreator.payoutAddress, utxos, privateKey)
