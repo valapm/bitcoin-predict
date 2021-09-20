@@ -35,6 +35,9 @@ import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt } from "./h
 
 const feeb = 0.5
 
+// TODO: Is at 135 now, 0 @ end 2021
+const DUST = 546
+
 const Signature = bsv.crypto.Signature
 
 const opReturnDataLength = 3
@@ -74,9 +77,10 @@ export function buildTx(market: marketInfo): bsv.Transaction {
   const token = getToken(market)
 
   const contractBalance = getLmsrSatsFixed(market.balance)
+  const satoshis = contractBalance < DUST ? DUST : contractBalance
 
   const tx = new bsv.Transaction()
-  tx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis: contractBalance }))
+  tx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis }))
 
   tx.feePerKb(feeb * 1000)
 
@@ -183,10 +187,21 @@ export function isValidMarketUpdateTx(tx: bsv.Transaction, prevTx: bsv.Transacti
   // console.log(interpreter.verify(unlockingScript, lockingScript, tx, 0, DEFAULT_FLAGS, prevTx.outputs[0].satoshisBN))
   // console.log(interpreter.errstr)
   // console.log(interpreter.stack.slice(interpreter.stack.length - 3, interpreter.stack.length))
-  return (
-    interpreter.verify(unlockingScript, lockingScript, tx, 0, DEFAULT_FLAGS, prevTx.outputs[0].satoshisBN) &&
-    isValidMarketTx(tx, entries)
+
+  const isValidScript = interpreter.verify(
+    unlockingScript,
+    lockingScript,
+    tx,
+    0,
+    DEFAULT_FLAGS,
+    prevTx.outputs[0].satoshisBN
   )
+
+  if (!isValidScript) {
+    console.error(interpreter.errstr)
+  }
+
+  return isValidScript && isValidMarketTx(tx, entries)
 }
 
 export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean {
@@ -384,17 +399,17 @@ export function getUpdateEntryTx(
     const winningShares = oldEntry.balance.shares[decision]
     const redeemed = winningShares - newEntry.balance.shares[decision]
 
-    // market creator can redeem invalid transactions
     if (redeemed !== 0) {
+      // User is redeeming shares
       redeemSats = redeemed * SatScaling
-      newTx.outputs[0].satoshis = prevTx.outputs[0].satoshis - redeemSats
+      newTx.outputs[0].satoshis = prevGlobalSatBalance - redeemSats
     } else {
-      const newGlobalSatBalance = newTx.outputs[0].satoshis
-      redeemSats = prevGlobalSatBalance - newGlobalSatBalance
+      // User is selling liquidity
+      redeemSats = prevGlobalSatBalance - getLmsrSatsFixed(newMarket.balance)
     }
   } else {
-    const newGlobalSatBalance = newTx.outputs[0].satoshis
-    redeemSats = prevGlobalSatBalance - newGlobalSatBalance
+    // User is buying, selling, changing liquidity or market creator is redeeming invalid shares after market is resolved
+    redeemSats = prevGlobalSatBalance - getLmsrSatsFixed(newMarket.balance)
   }
 
   // Add fee outputs to dev and creator
@@ -698,11 +713,9 @@ export function fundTx(
 ): bsv.Transaction {
   const inputCount = tx.inputs.length
 
-  // Handle dust limit TODO: Is at 135 now, 0 @ end 2021
-  const dustLimit = bsv.Transaction.DUST_AMOUNT
   const marketOutput = tx.outputs[0]
-  if (marketOutput.satoshis < dustLimit) {
-    marketOutput.satoshis = dustLimit
+  if (marketOutput.satoshis < DUST) {
+    marketOutput.satoshis = DUST
   }
 
   tx.feePerKb(satPerByte * 1000)
@@ -710,6 +723,10 @@ export function fundTx(
   tx.change(changeAddress)
 
   tx.from(utxos)
+
+  // Remove outputs smaller then dust limit
+  // TODO: Should be implemented in contract
+  // tx.outputs = tx.outputs.filter(output => output.satoshis >= DUST)
 
   // Check amount
   if (tx.inputAmount < tx.outputAmount) throw new Error(`Input amount needs to be at least ${tx.outputAmount}`)
