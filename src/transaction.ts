@@ -76,7 +76,7 @@ const opReturnDataLength = 3
 export function buildTx(market: marketInfo): bsv.Transaction {
   const token = getToken(market)
 
-  const contractBalance = getLmsrSatsFixed(market.balance)
+  const contractBalance = getLmsrSatsFixed(market.balance) + market.status.liquidityFeePool
   const satoshis = contractBalance < DUST ? DUST : contractBalance
 
   const tx = new bsv.Transaction()
@@ -143,9 +143,18 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
   const globalLiquidityPos = globalShareStatusPos - 2
   const globalLiquidity = parseInt(stateData.slice(globalLiquidityPos, globalShareStatusPos), 16)
 
+  const globalLiquidityPointsPos = globalLiquidityPos - 16
+  const globalLiquidityPointsHex = stateData.slice(globalLiquidityPointsPos, globalLiquidityPos)
+
+  const globalAccLiquidityFeePoolPos = globalLiquidityPointsPos - 10
+  const globalAccLiquidityFeePoolHex = stateData.slice(globalAccLiquidityFeePoolPos, globalLiquidityPointsPos)
+
+  const globalLiquidityFeePoolPos = globalAccLiquidityFeePoolPos - 10
+  const globalLiquidityFeePoolHex = stateData.slice(globalLiquidityFeePoolPos, globalAccLiquidityFeePoolPos)
+
   const globalVotesLength = globalOptionCount * voteCountByteLen * 2
-  const globalVotesPos = globalLiquidityPos - globalVotesLength
-  const globalVotesHex = stateData.slice(globalVotesPos, globalLiquidityPos)
+  const globalVotesPos = globalLiquidityFeePoolPos - globalVotesLength
+  const globalVotesHex = stateData.slice(globalVotesPos, globalLiquidityFeePoolPos)
 
   const oracleStatesLen = oracleCount * oracleStateByteLength * 2
   const oracleStatesPos = globalVotesPos - oracleStatesLen
@@ -164,7 +173,13 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
   return {
     version: opReturnData[0],
     details: getMarketDetailsFromHex(opReturnData[1]),
-    status: getMarketStatusfromHex(globalDecisionState, globalVotesHex),
+    status: getMarketStatusfromHex(
+      globalDecisionState,
+      globalVotesHex,
+      globalLiquidityFeePoolHex,
+      globalAccLiquidityFeePoolHex,
+      globalLiquidityPointsHex
+    ),
     oracles: getOracleDetailsFromHex(oracleKeysHex, globalOracleStates),
     balance: {
       liquidity: globalLiquidity,
@@ -175,8 +190,9 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
       pubKey: bsv.PublicKey.fromHex(asm[version.creatorPubKeyPos]),
       payoutAddress: bsv.Address.fromHex("00" + asm[version.creatorPayoutAddressPos])
     },
-    creatorFee: getIntFromOP(asm[version.creatorFeePos]),
-    requiredVotes: getIntFromOP(asm[version.requiredVotesPos])
+    creatorFee: getIntFromOP(asm[version.creatorFeePos]) / 100,
+    requiredVotes: getIntFromOP(asm[version.requiredVotesPos]),
+    liquidityFee: getIntFromOP(asm[version.liquidityFeeRatePos]) / 100
   }
 }
 
@@ -209,6 +225,7 @@ export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean 
   const balance = tx.outputs[0].satoshis
   const market = getMarketFromScript(script)
 
+  // FIXME: This is probably be removed. Script verifies it all.
   const hasValidSatBalance = getMinMarketSatBalance(market, entries) <= balance
 
   // console.log([
@@ -231,7 +248,8 @@ export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean 
 export function getAddEntryTx(
   prevTx: bsv.Transaction,
   prevEntries: entry[],
-  entry: entry,
+  publicKey: bsv.PublicKey,
+  balance: balance,
   payoutAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[],
   spendingPrivKey: bsv.PrivateKey,
@@ -242,6 +260,13 @@ export function getAddEntryTx(
 
   const lastEntry = getEntryHex(prevEntries[prevEntries.length - 1])
   const lastMerklePath = getMerklePath(prevEntries, prevEntries.length - 1)
+
+  const entry: entry = {
+    balance,
+    publicKey,
+    globalLiqidityFeePoolSave: prevMarket.status.accLiquidityFeePool,
+    liquidityPoints: 0
+  }
 
   const newEntries = prevEntries.concat([entry])
   const newGlobalBalance = getMarketBalance(newEntries, optionCount)
@@ -273,11 +298,16 @@ export function getAddEntryTx(
       1, // action = Add entry
       new Ripemd160(payoutAddress.hashBuffer.toString("hex")),
       changeSats,
-      new Bytes(getEntryHex(entry)),
+      new Bytes(entry.publicKey.toString()),
+      entry.balance.liquidity,
+      new Bytes(getSharesHex(entry.balance.shares)),
       new Bytes(lastEntry),
       new Bytes(lastMerklePath),
       0,
       new Bytes(""),
+      0,
+      0,
+      false,
       new Sig("00"),
       new Bytes(""),
       0,
@@ -294,11 +324,16 @@ export function getAddEntryTx(
   //   1, // action = Add entry
   //   new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
   //   changeSats,
-  //   new Bytes(getEntryHex(entry)).toLiteral(),
+  //   new Bytes(entry.publicKey.toString()).toLiteral(),
+  //   entry.balance.liquidity,
+  //   new Bytes(getSharesHex(entry.balance.shares)).toLiteral(),
   //   new Bytes(lastEntry).toLiteral(),
   //   new Bytes(lastMerklePath).toLiteral(),
   //   0,
   //   new Bytes("").toLiteral(),
+  //   0,
+  //   0,
+  //   false,
   //   new Sig("00").toLiteral(),
   //   new Bytes("").toLiteral(),
   //   0,
@@ -322,6 +357,7 @@ export function getUpdateEntryTx(
   prevTx: bsv.Transaction,
   prevEntries: entry[],
   newBalance: balance,
+  redeemLiquidityPoints: boolean,
   privateKey: bsv.PrivateKey,
   payoutAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[],
@@ -337,9 +373,15 @@ export function getUpdateEntryTx(
   if (entryIndex === -1) throw new Error("No entry with this publicKey found.")
 
   const oldEntry = prevEntries[entryIndex]
+
+  const feesSinceLastChange = prevMarket.status.accLiquidityFeePool - oldEntry.globalLiqidityFeePoolSave
+  const newEntryLiquidityPoints = oldEntry.liquidityPoints + feesSinceLastChange * oldEntry.balance.liquidity
+
   const newEntry: entry = {
     balance: newBalance,
-    publicKey
+    publicKey,
+    globalLiqidityFeePoolSave: prevMarket.status.accLiquidityFeePool,
+    liquidityPoints: redeemLiquidityPoints ? 0 : newEntryLiquidityPoints
   }
 
   const newEntries = [...prevEntries]
@@ -382,35 +424,57 @@ export function getUpdateEntryTx(
   const merklePath = getMerklePath(prevEntries, entryIndex)
   const newMerklePath = getMerklePath(newEntries, entryIndex)
 
+  const prevGlobalSatBalance = prevTx.outputs[0].satoshis
+  const prevMarketSatBalance = prevGlobalSatBalance - prevMarket.status.liquidityFeePool
+
+  // Determine payout
+  let redeemSats = 0
+
+  // Determine redeemed winning shares
+  let redeemShares = 0
+  if (prevMarket.status.decided) {
+    const decision = prevMarket.status.decision
+    const winningShares = oldEntry.balance.shares[decision]
+    redeemShares = winningShares - newEntry.balance.shares[decision]
+  }
+
+  let newMarketSatBalance = 0
+
+  if (redeemShares) {
+    // User is redeeming shares
+    redeemSats = redeemShares * SatScaling
+    newMarketSatBalance = prevMarketSatBalance - redeemSats
+  } else {
+    // User is buying, selling, changing liquidity or market creator is redeeming invalid shares after market is resolved
+    newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance)
+    redeemSats = prevMarketSatBalance - newMarketSatBalance
+  }
+
+  const liquidityFee = redeemSats > 0 ? (redeemSats * prevMarket.liquidityFee) / 100 : 0
+  const redeemedLiquidityPoolSats = redeemLiquidityPoints
+    ? (newEntryLiquidityPoints / prevMarket.status.liquidityFeePool) * prevMarket.status.liquidityFeePool
+    : 0
+  const newLiquidityFeePool = prevMarket.status.liquidityFeePool + liquidityFee - redeemedLiquidityPoolSats
+
+  const newLiquidityPoints = redeemLiquidityPoints
+    ? prevMarket.status.liquidityPoints - newEntryLiquidityPoints
+    : prevMarket.status.liquidityPoints
+  const newAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool + liquidityFee
+
   const newMarket: marketInfo = {
     ...prevMarket,
     balance: newGlobalBalance,
-    balanceMerkleRoot: getMerkleRootByPath(sha256(getEntryHex(newEntry)), newMerklePath)
+    balanceMerkleRoot: getMerkleRootByPath(sha256(getEntryHex(newEntry)), newMerklePath),
+    status: {
+      ...prevMarket.status,
+      liquidityPoints: newLiquidityPoints,
+      liquidityFeePool: newLiquidityFeePool,
+      accLiquidityFeePool: newAccLiquidityFeePool
+    }
   }
 
   const newTx = getUpdateMarketTx(prevTx, newMarket)
-
-  const prevGlobalSatBalance = prevTx.outputs[0].satoshis
-
-  // Determine redeem satoshis
-  let redeemSats = 0
-  if (prevMarket.status.decided && !redeemInvalid) {
-    const decision = prevMarket.status.decision
-    const winningShares = oldEntry.balance.shares[decision]
-    const redeemed = winningShares - newEntry.balance.shares[decision]
-
-    if (redeemed !== 0) {
-      // User is redeeming shares
-      redeemSats = redeemed * SatScaling
-      newTx.outputs[0].satoshis = prevGlobalSatBalance - redeemSats
-    } else {
-      // User is selling liquidity
-      redeemSats = prevGlobalSatBalance - getLmsrSatsFixed(newMarket.balance)
-    }
-  } else {
-    // User is buying, selling, changing liquidity or market creator is redeeming invalid shares after market is resolved
-    redeemSats = prevGlobalSatBalance - getLmsrSatsFixed(newMarket.balance)
-  }
+  newTx.outputs[0].satoshis = newMarketSatBalance + newLiquidityFeePool
 
   // Add fee outputs to dev and creator
   if (redeemSats > 0) {
@@ -444,11 +508,16 @@ export function getUpdateEntryTx(
       2, // action = Update entry
       new Ripemd160(payoutAddress.hashBuffer.toString("hex")),
       changeSats,
-      new Bytes(getEntryHex(newEntry)),
+      new Bytes(publicKey.toString()),
+      newBalance.liquidity,
+      new Bytes(getSharesHex(newBalance.shares)),
       new Bytes(""),
       new Bytes(""),
       oldEntry.balance.liquidity,
       new Bytes(getSharesHex(oldEntry.balance.shares)),
+      oldEntry.globalLiqidityFeePoolSave,
+      oldEntry.liquidityPoints,
+      redeemLiquidityPoints,
       new Sig(signature.toString("hex")),
       new Bytes(merklePath),
       0,
@@ -539,10 +608,15 @@ export function getOracleCommitTx(
       new Ripemd160("00"),
       0,
       new Bytes(""),
+      0,
+      new Bytes(""),
       new Bytes(""),
       new Bytes(""),
       0,
       new Bytes(""),
+      0,
+      0,
+      false,
       new Sig("00"),
       new Bytes(""),
       oracleIndex,
@@ -649,10 +723,15 @@ export function getOracleVoteTx(
       new Ripemd160("00"),
       0,
       new Bytes(""),
+      0,
+      new Bytes(""),
       new Bytes(""),
       new Bytes(""),
       0,
       new Bytes(""),
+      0,
+      0,
+      false,
       new Sig("00"),
       new Bytes(""),
       oracleIndex,
@@ -798,7 +877,7 @@ export function getOracleBurnUpdateTx(prevTx: bsv.Transaction, burnSats: number)
     output: prevTx.outputs[0] // prevTx of newTx here?
   })
 
-  input.clearSignatures = () => {}
+  input.clearSignatures = () => {} // eslint-disable-line
   input.isFullySigned = () => true
 
   newTx.addInput(input)

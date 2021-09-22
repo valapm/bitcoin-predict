@@ -16,6 +16,7 @@ export type version = {
   creatorPubKeyPos: number
   creatorPayoutAddressPos: number
   creatorFeePos: number
+  liquidityFeeRatePos: number
   maxOptionCount: number
   maxOracleCount: number
   devFee: number
@@ -24,30 +25,18 @@ export type version = {
 // Keep track of old versions for compatibility.
 export const versions: version[] = [
   {
-    identifier: "875142f650f13392c0bc8623ef70fe05",
-    version: "0.2.1",
+    identifier: "2ffb40dbde58288bcb596ac88906c02f",
+    version: "0.3.2",
     oracleKeyPos: 14,
     globalOptionCountPos: 15,
     requiredVotesPos: 16,
     creatorPubKeyPos: 17,
     creatorPayoutAddressPos: 18,
     creatorFeePos: 19,
+    liquidityFeeRatePos: 20,
     maxOptionCount: 6,
     maxOracleCount: 3,
-    devFee: 1
-  },
-  {
-    identifier: "4d46e634d1f57470289d5891efbf4d2f",
-    version: "0.2.0",
-    oracleKeyPos: 14,
-    globalOptionCountPos: 15,
-    requiredVotesPos: 16,
-    creatorPubKeyPos: 17,
-    creatorPayoutAddressPos: 18,
-    creatorFeePos: 19,
-    maxOptionCount: 6,
-    maxOracleCount: 3,
-    devFee: 1
+    devFee: 0.2
   }
 ]
 
@@ -57,11 +46,16 @@ interface PM extends AbstractContract {
     action: number,
     payoutAddress: Ripemd160,
     changeSats: number,
-    entry: Bytes,
+    publicKey: Bytes,
+    newLiquidity: number,
+    newEntryShares: Bytes,
     lastEntry: Bytes,
     lastMerklePath: Bytes,
     prevLiquidity: number,
     prevShares: Bytes,
+    prevAccLiquidityFeePoolState: number,
+    prevLiquidityPoints: number,
+    redeemLiquidity: boolean,
     signature: Sig,
     merklePath: Bytes,
     oraclePos: number,
@@ -86,11 +80,16 @@ export type marketStatus = {
   decided: boolean
   decision: number
   votes: number[]
+  liquidityFeePool: number
+  accLiquidityFeePool: number
+  liquidityPoints: number
 }
 
 export type entry = {
   balance: balance
   publicKey: bsv.PublicKey
+  globalLiqidityFeePoolSave: number
+  liquidityPoints: number
 }
 
 export type creatorInfo = {
@@ -108,6 +107,7 @@ export type marketInfo = {
   creator: creatorInfo
   creatorFee: number
   requiredVotes: number
+  liquidityFee: number
 }
 
 export const balanceTableByteLength = 32
@@ -159,6 +159,7 @@ export function getNewMarket(
   oracles: oracleDetail[],
   creator: creatorInfo,
   creatorFee: number,
+  liquidityFee: number,
   requiredVotes: number
 ): marketInfo {
   const votes = "0"
@@ -166,15 +167,18 @@ export function getNewMarket(
     .split("")
     .map(n => parseInt(n))
 
+  const status = { decided: false, decision: 0, votes, liquidityFeePool: 0, accLiquidityFeePool: 0, liquidityPoints: 0 }
+
   return {
     version: versions[0].identifier,
     details,
-    status: { decided: false, decision: 0, votes },
+    status,
     oracles,
     balance: getMarketBalance([entry], details.options.length),
     balanceMerkleRoot: getBalanceMerkleRoot([entry]),
     creator,
     creatorFee,
+    liquidityFee,
     requiredVotes
   }
 }
@@ -188,7 +192,8 @@ export function getToken(market: marketInfo): PM {
     market.requiredVotes, // requiredVotes,
     new PubKey(market.creator.pubKey.toHex()),
     new Ripemd160(market.creator.payoutAddress.hashBuffer.toString("hex")),
-    market.creatorFee
+    market.creatorFee * 100,
+    market.liquidityFee * 100
   ) as PM
 
   // console.log([
@@ -197,7 +202,8 @@ export function getToken(market: marketInfo): PM {
   //   market.requiredVotes, // requiredVotes,
   //   new PubKey(market.creator.pubKey.toHex()).toLiteral(),
   //   new Ripemd160(market.creator.payoutAddress.hashBuffer.toString("hex")).toLiteral(),
-  //   market.creatorFee
+  //   market.creatorFee * 100,
+  //   market.liquidityFee * 100
   // ])
 
   const marketDetailsHex = getMarketDetailsHex(market.details)
@@ -206,8 +212,19 @@ export function getToken(market: marketInfo): PM {
   const marketBalanceHex = getBalanceHex(market.balance)
   const marketBalanceMerkleRoot = String(market.balanceMerkleRoot)
   const marketVotesHex = getVotesHex(market.status.votes)
+  const liquidityFeePoolHex = int2Hex(market.status.liquidityFeePool, 5)
+  const accLiquidityFeePoolHex = int2Hex(market.status.accLiquidityFeePool, 5)
+  const liquidityPointsHex = int2Hex(market.status.liquidityPoints, 8)
 
-  const marketDataHex = marketStatusHex + oracleStatesHex + marketVotesHex + marketBalanceHex + marketBalanceMerkleRoot
+  const marketDataHex =
+    marketStatusHex +
+    oracleStatesHex +
+    marketVotesHex +
+    liquidityFeePoolHex +
+    accLiquidityFeePoolHex +
+    liquidityPointsHex +
+    marketBalanceHex +
+    marketBalanceMerkleRoot
 
   token.setDataPart(`${market.version} ${marketDetailsHex} ${marketDataHex}`)
 
@@ -221,14 +238,28 @@ export function getVotesHex(votes: number[]): string {
 }
 
 export function getEntryHex(entry: entry): string {
-  return entry.publicKey.toString() + getBalanceHex(entry.balance)
+  return (
+    entry.publicKey.toString() +
+    getBalanceHex(entry.balance) +
+    int2Hex(entry.globalLiqidityFeePoolSave, 5, false) +
+    int2Hex(entry.liquidityPoints, 8, false)
+  )
 }
 
 export function getEntryFromHex(bytes: string): entry {
+  const feePoolSavePos = bytes.length - 10 - 16
+  const liquidityPointsPos = bytes.length - 16
+
   const publicKey = bsv.PublicKey.fromString(bytes.slice(0, 66))
+  const balanceHex = bytes.slice(66, feePoolSavePos)
+  const feePoolHex = bytes.slice(feePoolSavePos, liquidityPointsPos)
+  const liquidityPointsHex = bytes.slice(liquidityPointsPos)
+
   return {
     publicKey,
-    balance: getBalanceFromHex(bytes.slice(66))
+    balance: getBalanceFromHex(balanceHex),
+    globalLiqidityFeePoolSave: parseInt(feePoolHex, 16),
+    liquidityPoints: parseInt(liquidityPointsHex, 16)
   }
 }
 
@@ -291,7 +322,13 @@ export function getMarketStatusHex(status: marketStatus): string {
   return isDecidedHex + resultHex
 }
 
-export function getMarketStatusfromHex(decisionHex: string, votesHex: string): marketStatus {
+export function getMarketStatusfromHex(
+  decisionHex: string,
+  votesHex: string,
+  liquidityFeePoolHex: string,
+  accLiquidityFeePoolHex: string,
+  liquidityPointsHex: string
+): marketStatus {
   // console.log(
   //   votesHex,
   //   "->",
@@ -302,7 +339,10 @@ export function getMarketStatusfromHex(decisionHex: string, votesHex: string): m
   return {
     decided: Boolean(parseInt(decisionHex.slice(0, 2), 16)),
     decision: parseInt(decisionHex.slice(2, 4), 16),
-    votes: splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => parseInt(reverseHex(n), 16))
+    votes: splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => parseInt(reverseHex(n), 16)),
+    liquidityFeePool: parseInt(liquidityFeePoolHex, 16),
+    accLiquidityFeePool: parseInt(accLiquidityFeePoolHex, 16),
+    liquidityPoints: parseInt(liquidityPointsHex, 16)
   }
 }
 
@@ -315,8 +355,20 @@ export function getMarketDetailsFromHex(hex: string): marketDetails {
 }
 
 export function isValidMarketStatus(status: marketStatus, optionCount: number): status is marketStatus {
+  // console.log([
+  //   status.decided === false || status.decided === true,
+  //   status.decision >= 0 || status.decision < optionCount,
+  //   status.liquidityFeePool >= 0,
+  //   status.accLiquidityFeePool >= status.liquidityFeePool,
+  //   status.liquidityPoints >= status.liquidityFeePool
+  // ])
+
   return (
-    (status.decided === false || status.decided === true) && (status.decision >= 0 || status.decision < optionCount)
+    (status.decided === false || status.decided === true) &&
+    (status.decision >= 0 || status.decision < optionCount) &&
+    status.liquidityFeePool >= 0 &&
+    status.accLiquidityFeePool >= status.liquidityFeePool &&
+    status.liquidityPoints >= status.liquidityFeePool
   )
 }
 
@@ -329,6 +381,15 @@ export function isValidMarketBalance(balance: balance): balance is balance {
 }
 
 export function isValidMarketInfo(market: marketInfo): boolean {
+  // console.log([
+  //   isValidMarketStatus(market.status, market.details.options.length),
+  //   isValidMarketDetails(market.details),
+  //   isValidMarketBalance(market.balance),
+  //   isValidOracleDetails(market.oracles),
+  //   isHash(market.balanceMerkleRoot),
+  //   market.status.votes.length === market.details.options.length
+  // ])
+
   return (
     isValidMarketStatus(market.status, market.details.options.length) &&
     isValidMarketDetails(market.details) &&
@@ -341,20 +402,17 @@ export function isValidMarketInfo(market: marketInfo): boolean {
 
 export function validateEntries(market: marketInfo, entries: entry[]): boolean {
   const optionCount = market.details.options.length
+  const calculatedBalance = getMarketBalance(entries, optionCount)
+  const calculatedLiquidityPoints = entries.reduce((points, entry) => points + entry.liquidityPoints, 0)
 
-  let hasCorrectBalance
-  if (market.status.decided) {
-    // When market is resolved global balance is detached so owner can redeem loosing shares.
-    // TODO: Should probably be changed.
-    hasCorrectBalance = true
-  } else {
-    const calculatedBalance = getMarketBalance(entries, optionCount)
-    hasCorrectBalance =
-      market.balance.liquidity === calculatedBalance.liquidity &&
-      market.balance.shares.every((n, i) => n === calculatedBalance.shares[i])
-  }
+  const hasCorrectLiquidity = market.balance.liquidity === calculatedBalance.liquidity
+  const hasCorrectShares = market.status.decided
+    ? true
+    : market.balance.shares.every((n, i) => n === calculatedBalance.shares[i])
+  const hasCorrectLiquidityPoints = market.status.liquidityPoints === calculatedLiquidityPoints
+  const hasCorrectBalanceMerkleRoot = market.balanceMerkleRoot === getBalanceMerkleRoot(entries)
 
-  return hasCorrectBalance && market.balanceMerkleRoot === getBalanceMerkleRoot(entries)
+  return hasCorrectLiquidity && hasCorrectShares && hasCorrectLiquidityPoints && hasCorrectBalanceMerkleRoot
 }
 
 export function getMinMarketSatBalance(market: marketInfo, entries: entry[]): number {
@@ -366,9 +424,9 @@ export function getMinMarketSatBalance(market: marketInfo, entries: entry[]): nu
 
   if (isDecided) {
     const shares = balance.shares[market.status.decision]
-    return shares * SatScaling
+    return shares * SatScaling + market.status.liquidityFeePool
   } else {
-    return getLmsrSatsFixed(balance)
+    return getLmsrSatsFixed(balance) + market.status.liquidityFeePool
   }
 }
 
@@ -378,4 +436,8 @@ export function isValidMarketInit(market: marketInfo): boolean {
     market.status.votes.reduce((a, b) => a + b, 0) === 0 &&
     market.oracles.every(oracle => !oracle.committed && !oracle.voted)
   )
+}
+
+export function isValidMarketInitEntry(entry: entry): boolean {
+  return entry.globalLiqidityFeePoolSave === 0 && entry.liquidityPoints === 0
 }

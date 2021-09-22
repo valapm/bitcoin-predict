@@ -8,14 +8,14 @@ export function reverseHex(s: string): string {
   return array.reverse().join("")
 }
 
-export function int2Hex(num: number | bigint, byteSize?: number): string {
+export function int2Hex(num: number | bigint, byteSize?: number, reverse = true): string {
   let hex = num.toString(16)
 
   if (byteSize) {
     hex = ("0".repeat(byteSize * 4) + hex).slice(-byteSize * 2)
   }
 
-  return reverseHex(hex)
+  return reverse ? reverseHex(hex) : hex
 }
 
 export function bool2Hex(bool: boolean): string {
