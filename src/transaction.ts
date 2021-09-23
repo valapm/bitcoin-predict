@@ -31,7 +31,7 @@ import { getMerkleRootByPath } from "./merkleTree"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinPrivKey, RabinSignature, rabinPubKey } from "rabinsig"
-import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt } from "./hex"
+import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt, hex2Int } from "./hex"
 
 const feeb = 0.5
 
@@ -228,6 +228,9 @@ export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean 
   // FIXME: This is probably be removed. Script verifies it all.
   const hasValidSatBalance = getMinMarketSatBalance(market, entries) <= balance
 
+  // console.log([getMinMarketSatBalance(market, entries), balance])
+  // console.log(market.status)
+
   // console.log([
   //   tx.verify() === true,
   //   !tx.getSerializationError(),
@@ -388,7 +391,6 @@ export function getUpdateEntryTx(
   newEntries[entryIndex] = newEntry
 
   let newGlobalBalance: balance
-  let redeemInvalid = false
   if (prevMarket.status.decided) {
     const decision = prevMarket.status.decision
     const winningShares = oldEntry.balance.shares[decision]
@@ -412,7 +414,6 @@ export function getUpdateEntryTx(
         i === prevMarket.status.decision ? shares : 0
       )
       newGlobalBalance.shares = onlyValidShares
-      redeemInvalid = true
     } else {
       newGlobalBalance = getMarketBalance(newEntries, optionCount)
       newGlobalBalance.shares = prevMarket.balance.shares
@@ -438,6 +439,10 @@ export function getUpdateEntryTx(
     redeemShares = winningShares - newEntry.balance.shares[decision]
   }
 
+  // Determine if redeeming invalid shares
+  // const redeemInvalid =
+  //   prevMarket.status.decided && publicKey.toString() === prevMarket.creator.pubKey.toString() && !redeemShares
+
   let newMarketSatBalance = 0
 
   if (redeemShares) {
@@ -447,18 +452,19 @@ export function getUpdateEntryTx(
   } else {
     // User is buying, selling, changing liquidity or market creator is redeeming invalid shares after market is resolved
     newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance)
+
     redeemSats = prevMarketSatBalance - newMarketSatBalance
   }
 
-  const liquidityFee = redeemSats > 0 ? (redeemSats * prevMarket.liquidityFee) / 100 : 0
+  const liquidityFee = redeemSats > 0 ? Math.floor((redeemSats * prevMarket.liquidityFee) / 100) : 0
   const redeemedLiquidityPoolSats = redeemLiquidityPoints
-    ? (newEntryLiquidityPoints / prevMarket.status.liquidityFeePool) * prevMarket.status.liquidityFeePool
+    ? (newEntryLiquidityPoints / prevMarket.status.liquidityPoints) * prevMarket.status.liquidityFeePool
     : 0
   const newLiquidityFeePool = prevMarket.status.liquidityFeePool + liquidityFee - redeemedLiquidityPoolSats
 
   const newLiquidityPoints = redeemLiquidityPoints
-    ? prevMarket.status.liquidityPoints - newEntryLiquidityPoints
-    : prevMarket.status.liquidityPoints
+    ? prevMarket.status.liquidityPoints + liquidityFee * prevMarket.balance.liquidity - newEntryLiquidityPoints
+    : prevMarket.status.liquidityPoints + liquidityFee * prevMarket.balance.liquidity
   const newAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool + liquidityFee
 
   const newMarket: marketInfo = {
@@ -534,11 +540,16 @@ export function getUpdateEntryTx(
   //   2, // action = Update entry
   //   new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
   //   changeSats,
-  //   new Bytes(getEntryHex(newEntry)).toLiteral(),
+  //   new Bytes(publicKey.toString()).toLiteral(),
+  //   newBalance.liquidity,
+  //   new Bytes(getSharesHex(newBalance.shares)).toLiteral(),
   //   new Bytes("").toLiteral(),
   //   new Bytes("").toLiteral(),
   //   oldEntry.balance.liquidity,
   //   new Bytes(getSharesHex(oldEntry.balance.shares)).toLiteral(),
+  //   oldEntry.globalLiqidityFeePoolSave,
+  //   oldEntry.liquidityPoints,
+  //   redeemLiquidityPoints,
   //   new Sig(signature.toString("hex")).toLiteral(),
   //   new Bytes(merklePath).toLiteral(),
   //   0,
@@ -554,6 +565,9 @@ export function getUpdateEntryTx(
 
   // const asm = prevTx.outputs[0].script.toASM().split(" ")
   // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
+
+  // const asm = newTx.outputs[0].script.toASM().split(" ")
+  // console.log(asm[asm.length - 1])
 
   return newTx
 }

@@ -727,6 +727,118 @@ test("Redeem winning shares after loosing shares", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
+test("liquidity points generation", () => {
+  const entry1: entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [1, 0, 2]
+    },
+    globalLiqidityFeePoolSave: 0,
+    liquidityPoints: 0
+  }
+
+  const market1 = getNewMarket(
+    marketDetails,
+    entry1,
+    oracleDetails,
+    marketCreator,
+    // localMarketCreator,
+    creatorFee,
+    liquidityFee,
+    requiredVotes
+  )
+
+  const tx1 = buildTx(market1)
+  fundTx(tx1, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 2,
+    shares: [1, 0, 0]
+  }
+
+  const tx2 = getUpdateEntryTx(
+    tx1,
+    [entry1],
+    newBalance,
+    false,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey
+  )
+
+  const newEntry: entry = cloneDeep(entry1)
+  newEntry.balance = newBalance
+
+  const newEntries = [newEntry]
+  const market2 = getMarketFromScript(tx2.outputs[0].script)
+
+  expect(market2.status.accLiquidityFeePool > 0).toBe(true)
+  expect(market2.status.liquidityFeePool > 0).toBe(true)
+  expect(market2.status.liquidityPoints > 0).toBe(true)
+  expect(isValidMarketUpdateTx(tx2, tx1, newEntries)).toBe(true)
+})
+
+test("liquidity points redeeming", () => {
+  const entry1: entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [1, 0, 2]
+    },
+    globalLiqidityFeePoolSave: 0,
+    liquidityPoints: 1000
+  }
+
+  const market1 = getNewMarket(
+    marketDetails,
+    entry1,
+    oracleDetails,
+    marketCreator,
+    // localMarketCreator,
+    creatorFee,
+    liquidityFee,
+    requiredVotes
+  )
+
+  market1.status.accLiquidityFeePool = 1000
+  market1.status.liquidityFeePool = 1000
+  market1.status.liquidityPoints = 10000
+
+  const tx1 = buildTx(market1)
+  fundTx(tx1, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 2,
+    shares: [1, 0, 2]
+  }
+
+  const tx2 = getUpdateEntryTx(
+    tx1,
+    [entry1],
+    newBalance,
+    true,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey
+  )
+
+  const newEntry: entry = cloneDeep(entry1)
+  newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = 1000
+  newEntry.liquidityPoints = 0
+
+  const newEntries = [newEntry]
+  const market2 = getMarketFromScript(tx2.outputs[0].script)
+
+  expect(isValidMarketUpdateTx(tx2, tx1, newEntries)).toBe(true)
+  expect(market2.status.accLiquidityFeePool).toBe(1000)
+  expect(market2.status.liquidityFeePool).toBe(700)
+  expect(market2.status.liquidityPoints).toBe(7000)
+})
+
 test("full market graph", () => {
   // Create market
 
@@ -900,15 +1012,16 @@ test("full market graph", () => {
   const entry10: entry = {
     publicKey: publicKey2,
     balance: balance10,
-    globalLiqidityFeePoolSave: 0,
+    globalLiqidityFeePoolSave: market9.status.accLiquidityFeePool,
     liquidityPoints: 0
   }
-
   const entries10 = [entry5, entry10]
 
   expect(isValidMarketUpdateTx(tx10, tx9, entries10)).toBe(true)
 
   // Market creator redeems winning shares
+
+  const market10 = getMarketFromScript(tx10.outputs[0].script)
 
   const balance11: balance = {
     liquidity: 3,
@@ -929,8 +1042,8 @@ test("full market graph", () => {
   const entry11: entry = {
     publicKey: privateKey.publicKey,
     balance: balance11,
-    globalLiqidityFeePoolSave: 0,
-    liquidityPoints: 0
+    globalLiqidityFeePoolSave: market10.status.accLiquidityFeePool,
+    liquidityPoints: balance5.liquidity * market10.status.accLiquidityFeePool
   }
 
   const entries11 = [entry11, entry10]
@@ -938,6 +1051,8 @@ test("full market graph", () => {
   expect(isValidMarketUpdateTx(tx11, tx10, entries11)).toBe(true)
 
   // Market creator redeems loosing shares and sells liquidity
+
+  const market11 = getMarketFromScript(tx11.outputs[0].script)
 
   const balance12: balance = {
     liquidity: 0,
@@ -958,13 +1073,43 @@ test("full market graph", () => {
   const entry12: entry = {
     publicKey: privateKey.publicKey,
     balance: balance12,
-    globalLiqidityFeePoolSave: 0,
-    liquidityPoints: 0
+    globalLiqidityFeePoolSave: market11.status.accLiquidityFeePool,
+    liquidityPoints:
+      entry11.liquidityPoints +
+      entry11.balance.liquidity * (market11.status.liquidityFeePool - entry11.globalLiqidityFeePoolSave)
   }
 
   const entries12 = [entry12, entry10]
 
   expect(isValidMarketUpdateTx(tx12, tx11, entries12)).toBe(true)
+
+  // User redeeming liquidity points
+
+  const market12 = getMarketFromScript(tx12.outputs[0].script)
+
+  const tx13 = getUpdateEntryTx(
+    tx12,
+    entries12,
+    balance12,
+    true,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey
+  )
+
+  const entry13: entry = {
+    publicKey: privateKey.publicKey,
+    balance: balance12,
+    globalLiqidityFeePoolSave: market12.status.accLiquidityFeePool,
+    liquidityPoints: 0
+  }
+
+  const entries13 = [entry13, entry10]
+
+  expect(isValidMarketUpdateTx(tx13, tx12, entries13)).toBe(true)
+
+  console.log(getMarketFromScript(tx13.outputs[0].script).status)
   expect(tx12.outputs[0].satoshis).toBe(546) // Only dust remains
 })
 

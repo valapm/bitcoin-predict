@@ -39,6 +39,10 @@ export function fromHex(s: string): string {
   return chars.map(char => String.fromCharCode(parseInt(char, 16))).join("")
 }
 
+export function hex2Int(hex: string): number {
+  return parseInt("0x" + reverseHex(hex), 16)
+}
+
 export function hex2BigInt(hex: string): bigint {
   return BigInt("0x" + reverseHex(hex))
 }

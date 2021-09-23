@@ -1,6 +1,6 @@
 import { compile, bsv, buildContractClass, SigHashPreimage, PubKey, Bytes, Sig, Ripemd160 } from "scryptlib"
 import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
-import { int2Hex, toHex, fromHex, hex2IntArray, splitHexByNumber, reverseHex } from "./hex"
+import { int2Hex, toHex, fromHex, hex2IntArray, splitHexByNumber, reverseHex, hex2Int } from "./hex"
 import { isHash, hash, sha256 } from "./sha"
 import { oracleDetail, getOracleDetailsHex, isValidOracleDetails, getOracleStatesHex } from "./oracle"
 import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
@@ -25,8 +25,8 @@ export type version = {
 // Keep track of old versions for compatibility.
 export const versions: version[] = [
   {
-    identifier: "2ffb40dbde58288bcb596ac88906c02f",
-    version: "0.3.2",
+    identifier: "362769cc52beef89556f1d63500f7d2f",
+    version: "0.3.4",
     oracleKeyPos: 14,
     globalOptionCountPos: 15,
     requiredVotesPos: 16,
@@ -238,11 +238,18 @@ export function getVotesHex(votes: number[]): string {
 }
 
 export function getEntryHex(entry: entry): string {
+  // console.log(
+  //   entry.publicKey.toString() +
+  //     getBalanceHex(entry.balance) +
+  //     int2Hex(entry.globalLiqidityFeePoolSave, 5) +
+  //     int2Hex(entry.liquidityPoints, 8)
+  // )
+
   return (
     entry.publicKey.toString() +
     getBalanceHex(entry.balance) +
-    int2Hex(entry.globalLiqidityFeePoolSave, 5, false) +
-    int2Hex(entry.liquidityPoints, 8, false)
+    int2Hex(entry.globalLiqidityFeePoolSave, 5) +
+    int2Hex(entry.liquidityPoints, 8)
   )
 }
 
@@ -258,8 +265,8 @@ export function getEntryFromHex(bytes: string): entry {
   return {
     publicKey,
     balance: getBalanceFromHex(balanceHex),
-    globalLiqidityFeePoolSave: parseInt(feePoolHex, 16),
-    liquidityPoints: parseInt(liquidityPointsHex, 16)
+    globalLiqidityFeePoolSave: hex2Int(feePoolHex),
+    liquidityPoints: hex2Int(liquidityPointsHex)
   }
 }
 
@@ -336,13 +343,14 @@ export function getMarketStatusfromHex(
   //   "->",
   //   splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => parseInt(reverseHex(n), 16))
   // )
+
   return {
     decided: Boolean(parseInt(decisionHex.slice(0, 2), 16)),
     decision: parseInt(decisionHex.slice(2, 4), 16),
     votes: splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => parseInt(reverseHex(n), 16)),
-    liquidityFeePool: parseInt(liquidityFeePoolHex, 16),
-    accLiquidityFeePool: parseInt(accLiquidityFeePoolHex, 16),
-    liquidityPoints: parseInt(liquidityPointsHex, 16)
+    liquidityFeePool: hex2Int(liquidityFeePoolHex),
+    accLiquidityFeePool: hex2Int(accLiquidityFeePoolHex),
+    liquidityPoints: hex2Int(liquidityPointsHex)
   }
 }
 
@@ -368,7 +376,8 @@ export function isValidMarketStatus(status: marketStatus, optionCount: number): 
     (status.decision >= 0 || status.decision < optionCount) &&
     status.liquidityFeePool >= 0 &&
     status.accLiquidityFeePool >= status.liquidityFeePool &&
-    status.liquidityPoints >= status.liquidityFeePool
+    status.liquidityFeePool >= 0 &&
+    status.liquidityPoints >= 0
   )
 }
 
@@ -403,16 +412,20 @@ export function isValidMarketInfo(market: marketInfo): boolean {
 export function validateEntries(market: marketInfo, entries: entry[]): boolean {
   const optionCount = market.details.options.length
   const calculatedBalance = getMarketBalance(entries, optionCount)
-  const calculatedLiquidityPoints = entries.reduce((points, entry) => points + entry.liquidityPoints, 0)
 
   const hasCorrectLiquidity = market.balance.liquidity === calculatedBalance.liquidity
   const hasCorrectShares = market.status.decided
     ? true
     : market.balance.shares.every((n, i) => n === calculatedBalance.shares[i])
-  const hasCorrectLiquidityPoints = market.status.liquidityPoints === calculatedLiquidityPoints
   const hasCorrectBalanceMerkleRoot = market.balanceMerkleRoot === getBalanceMerkleRoot(entries)
 
-  return hasCorrectLiquidity && hasCorrectShares && hasCorrectLiquidityPoints && hasCorrectBalanceMerkleRoot
+  // console.log({
+  //   hasCorrectLiquidity,
+  //   hasCorrectShares,
+  //   hasCorrectBalanceMerkleRoot
+  // })
+
+  return hasCorrectLiquidity && hasCorrectShares && hasCorrectBalanceMerkleRoot
 }
 
 export function getMinMarketSatBalance(market: marketInfo, entries: entry[]): number {
