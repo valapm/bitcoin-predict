@@ -377,29 +377,21 @@ export function getUpdateEntryTx(
 
   const oldEntry = prevEntries[entryIndex]
 
-  const feesSinceLastChange = prevMarket.status.accLiquidityFeePool - oldEntry.globalLiqidityFeePoolSave
-  const newEntryLiquidityPoints = oldEntry.liquidityPoints + feesSinceLastChange * oldEntry.balance.liquidity
-
-  const newEntry: entry = {
-    balance: newBalance,
-    publicKey,
-    globalLiqidityFeePoolSave: prevMarket.status.accLiquidityFeePool,
-    liquidityPoints: redeemLiquidityPoints ? 0 : newEntryLiquidityPoints
-  }
-
-  const newEntries = [...prevEntries]
-  newEntries[entryIndex] = newEntry
-
   let newGlobalBalance: balance
+  const updatedBalanceEntries = [...prevEntries]
+  updatedBalanceEntries[entryIndex] = {
+    ...oldEntry,
+    balance: newBalance
+  }
   if (prevMarket.status.decided) {
     const decision = prevMarket.status.decision
     const winningShares = oldEntry.balance.shares[decision]
-    const redeemed = winningShares - newEntry.balance.shares[decision]
+    const redeemed = winningShares - newBalance.shares[decision]
 
     if (redeemed !== 0) {
       // Redeem winning shares
 
-      if (!newEntry.balance.shares.every((newShares, index) => index === decision || newShares === 0))
+      if (!newBalance.shares.every((newShares, index) => index === decision || newShares === 0))
         throw new Error("Loosing shares must be set to 0")
 
       newGlobalBalance = {
@@ -409,21 +401,18 @@ export function getUpdateEntryTx(
     } else if (publicKey.toString() === prevMarket.creator.pubKey.toString()) {
       // Redeem invalid shares
 
-      newGlobalBalance = getMarketBalance(newEntries, optionCount)
+      newGlobalBalance = getMarketBalance(updatedBalanceEntries, optionCount)
       const onlyValidShares = newGlobalBalance.shares.map((shares, i) =>
         i === prevMarket.status.decision ? shares : 0
       )
       newGlobalBalance.shares = onlyValidShares
     } else {
-      newGlobalBalance = getMarketBalance(newEntries, optionCount)
+      newGlobalBalance = getMarketBalance(updatedBalanceEntries, optionCount)
       newGlobalBalance.shares = prevMarket.balance.shares
     }
   } else {
-    newGlobalBalance = getMarketBalance(newEntries, optionCount)
+    newGlobalBalance = getMarketBalance(updatedBalanceEntries, optionCount)
   }
-
-  const merklePath = getMerklePath(prevEntries, entryIndex)
-  const newMerklePath = getMerklePath(newEntries, entryIndex)
 
   const prevGlobalSatBalance = prevTx.outputs[0].satoshis
   const prevMarketSatBalance = prevGlobalSatBalance - prevMarket.status.liquidityFeePool
@@ -436,7 +425,7 @@ export function getUpdateEntryTx(
   if (prevMarket.status.decided) {
     const decision = prevMarket.status.decision
     const winningShares = oldEntry.balance.shares[decision]
-    redeemShares = winningShares - newEntry.balance.shares[decision]
+    redeemShares = winningShares - newBalance.shares[decision]
   }
 
   // Determine if redeeming invalid shares
@@ -457,6 +446,25 @@ export function getUpdateEntryTx(
   }
 
   const liquidityFee = redeemSats > 0 ? Math.floor((redeemSats * prevMarket.liquidityFee) / 100) : 0
+
+  const feesSinceLastChange = prevMarket.status.accLiquidityFeePool - oldEntry.globalLiqidityFeePoolSave + liquidityFee
+  const newEntryLiquidityPoints = oldEntry.liquidityPoints + feesSinceLastChange * oldEntry.balance.liquidity
+
+  const newAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool + liquidityFee
+
+  const newEntry: entry = {
+    balance: newBalance,
+    publicKey,
+    globalLiqidityFeePoolSave: newAccLiquidityFeePool,
+    liquidityPoints: redeemLiquidityPoints ? 0 : newEntryLiquidityPoints
+  }
+
+  const newEntries = [...prevEntries]
+  newEntries[entryIndex] = newEntry
+
+  const merklePath = getMerklePath(prevEntries, entryIndex)
+  const newMerklePath = getMerklePath(newEntries, entryIndex)
+
   const redeemedLiquidityPoolSats = redeemLiquidityPoints
     ? (newEntryLiquidityPoints / prevMarket.status.liquidityPoints) * prevMarket.status.liquidityFeePool
     : 0
@@ -465,7 +473,25 @@ export function getUpdateEntryTx(
   const newLiquidityPoints = redeemLiquidityPoints
     ? prevMarket.status.liquidityPoints + liquidityFee * prevMarket.balance.liquidity - newEntryLiquidityPoints
     : prevMarket.status.liquidityPoints + liquidityFee * prevMarket.balance.liquidity
-  const newAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool + liquidityFee
+
+  // console.log({
+  //   prevEntryBalance: oldEntry.balance,
+  //   prevEntryLiquidityPoints: oldEntry.liquidityPoints,
+  //   prevEntryGlobalLiquidityPoolSave: oldEntry.globalLiqidityFeePoolSave,
+  //   prevMarketBalance: prevMarket.balance,
+  //   newGlobalBalance,
+  //   feesSinceLastChange,
+  //   newEntryBalance: newEntry.balance,
+  //   newEntryLiquidityPoints,
+  //   prevLiquidityFeePool: prevMarket.status.liquidityFeePool,
+  //   prevMarketLiquidityPoints: prevMarket.status.liquidityPoints,
+  //   liquidityFee,
+  //   redeemedLiquidityPoolSats,
+  //   newLiquidityFeePool,
+  //   newLiquidityPoints,
+  //   newAccLiquidityFeePool,
+  //   newMarketSatBalance
+  // })
 
   const newMarket: marketInfo = {
     ...prevMarket,

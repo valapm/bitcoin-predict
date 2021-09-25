@@ -268,8 +268,11 @@ test("update entry and sell liquidity", () => {
     privateKey
   )
 
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
   const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
 
   const newEntries = [newEntry]
 
@@ -303,8 +306,11 @@ test("update entry and sell all liqudity", () => {
   // console.log(newTx.outputs[0].satoshis)
   // console.log(getMarketFromScript(newTx.outputs[0].script))
 
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
   const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
 
   const newEntries = [newEntry]
 
@@ -455,8 +461,11 @@ test("redeem winning shares", () => {
     privateKey
   )
 
-  const newEntry: entry = cloneDeep(entry)
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
 
   const newEntries = [newEntry]
 
@@ -505,8 +514,11 @@ test("redeem invalid shares", () => {
     privateKey
   )
 
-  const newEntry: entry = cloneDeep(entry)
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
 
   const newEntries = [newEntry]
 
@@ -560,8 +572,11 @@ test("sell liquidity after market is resolved", () => {
     privateKey
   )
 
-  const newEntry: entry = cloneDeep(entry)
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
 
   const newEntries = [newEntry]
 
@@ -610,8 +625,11 @@ test("Market creator can sell liquidity after market is resolved", () => {
     privateKey
   )
 
-  const newEntry: entry = cloneDeep(entry)
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
 
   const newEntries = [newEntry]
 
@@ -719,8 +737,11 @@ test("Redeem winning shares after loosing shares", () => {
     privateKey
   )
 
-  const newEntry: entry = cloneDeep(entry)
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newEntry: entry = cloneDeep(entries[0])
   newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
 
   const newEntries = [newEntry]
 
@@ -768,8 +789,11 @@ test("liquidity points generation", () => {
     privateKey
   )
 
+  const newMarket = getMarketFromScript(tx2.outputs[0].script)
   const newEntry: entry = cloneDeep(entry1)
   newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
 
   const newEntries = [newEntry]
   const market2 = getMarketFromScript(tx2.outputs[0].script)
@@ -954,12 +978,14 @@ test("full market graph", () => {
   const entry5: entry = {
     publicKey: privateKey.publicKey,
     balance: balance5,
-    globalLiqidityFeePoolSave: 0,
-    liquidityPoints: 0
+    globalLiqidityFeePoolSave: 896,
+    liquidityPoints: 2688
   }
 
   const entries5 = [entry5, entry2]
+  const market5 = getMarketFromScript(tx5.outputs[0].script)
 
+  expect(entry5.liquidityPoints).toBe(market5.status.liquidityPoints)
   expect(isValidMarketUpdateTx(tx5, tx4, entries5)).toBe(true)
 
   // Oracle 1 commit
@@ -1009,10 +1035,11 @@ test("full market graph", () => {
     privateKey
   )
 
+  const market10 = getMarketFromScript(tx10.outputs[0].script)
   const entry10: entry = {
     publicKey: publicKey2,
     balance: balance10,
-    globalLiqidityFeePoolSave: market9.status.accLiquidityFeePool,
+    globalLiqidityFeePoolSave: market10.status.accLiquidityFeePool,
     liquidityPoints: 0
   }
   const entries10 = [entry5, entry10]
@@ -1020,8 +1047,6 @@ test("full market graph", () => {
   expect(isValidMarketUpdateTx(tx10, tx9, entries10)).toBe(true)
 
   // Market creator redeems winning shares
-
-  const market10 = getMarketFromScript(tx10.outputs[0].script)
 
   const balance11: balance = {
     liquidity: 3,
@@ -1039,11 +1064,14 @@ test("full market graph", () => {
     privateKey
   )
 
+  const market11 = getMarketFromScript(tx11.outputs[0].script)
   const entry11: entry = {
     publicKey: privateKey.publicKey,
     balance: balance11,
-    globalLiqidityFeePoolSave: market10.status.accLiquidityFeePool,
-    liquidityPoints: balance5.liquidity * market10.status.accLiquidityFeePool
+    globalLiqidityFeePoolSave: market11.status.accLiquidityFeePool,
+    liquidityPoints:
+      entry5.liquidityPoints +
+      balance5.liquidity * (market11.status.accLiquidityFeePool - entry5.globalLiqidityFeePoolSave)
   }
 
   const entries11 = [entry11, entry10]
@@ -1051,8 +1079,6 @@ test("full market graph", () => {
   expect(isValidMarketUpdateTx(tx11, tx10, entries11)).toBe(true)
 
   // Market creator redeems loosing shares and sells liquidity
-
-  const market11 = getMarketFromScript(tx11.outputs[0].script)
 
   const balance12: balance = {
     liquidity: 0,
@@ -1070,13 +1096,14 @@ test("full market graph", () => {
     privateKey
   )
 
+  const market12 = getMarketFromScript(tx12.outputs[0].script)
   const entry12: entry = {
     publicKey: privateKey.publicKey,
     balance: balance12,
-    globalLiqidityFeePoolSave: market11.status.accLiquidityFeePool,
+    globalLiqidityFeePoolSave: market12.status.accLiquidityFeePool,
     liquidityPoints:
       entry11.liquidityPoints +
-      entry11.balance.liquidity * (market11.status.liquidityFeePool - entry11.globalLiqidityFeePoolSave)
+      entry11.balance.liquidity * (market12.status.liquidityFeePool - entry11.globalLiqidityFeePoolSave)
   }
 
   const entries12 = [entry12, entry10]
@@ -1084,8 +1111,6 @@ test("full market graph", () => {
   expect(isValidMarketUpdateTx(tx12, tx11, entries12)).toBe(true)
 
   // User redeeming liquidity points
-
-  const market12 = getMarketFromScript(tx12.outputs[0].script)
 
   const tx13 = getUpdateEntryTx(
     tx12,
@@ -1098,19 +1123,18 @@ test("full market graph", () => {
     privateKey
   )
 
+  const market13 = getMarketFromScript(tx13.outputs[0].script)
   const entry13: entry = {
     publicKey: privateKey.publicKey,
     balance: balance12,
-    globalLiqidityFeePoolSave: market12.status.accLiquidityFeePool,
+    globalLiqidityFeePoolSave: market13.status.accLiquidityFeePool,
     liquidityPoints: 0
   }
 
   const entries13 = [entry13, entry10]
 
   expect(isValidMarketUpdateTx(tx13, tx12, entries13)).toBe(true)
-
-  console.log(getMarketFromScript(tx13.outputs[0].script).status)
-  expect(tx12.outputs[0].satoshis).toBe(546) // Only dust remains
+  expect(tx13.outputs[0].satoshis).toBe(546) // Only dust remains
 })
 
 test("get function from script", () => {
