@@ -155,7 +155,6 @@ export function getMarketVersion(identifier: string): version {
 
 export function getNewMarket(
   details: marketDetails,
-  entry: entry,
   oracles: oracleDetail[],
   creator: creatorInfo,
   creatorFee: number,
@@ -174,8 +173,11 @@ export function getNewMarket(
     details,
     status,
     oracles,
-    balance: getMarketBalance([entry], details.options.length),
-    balanceMerkleRoot: getBalanceMerkleRoot([entry]),
+    balance: {
+      liquidity: 0,
+      shares: new Array(details.options.length).fill(0) as number[]
+    },
+    balanceMerkleRoot: getMerkleRoot([sha256("00")]),
     creator,
     creatorFee,
     liquidityFee,
@@ -215,6 +217,17 @@ export function getToken(market: marketInfo): PM {
   const liquidityFeePoolHex = int2Hex(market.status.liquidityFeePool, 5)
   const accLiquidityFeePoolHex = int2Hex(market.status.accLiquidityFeePool, 5)
   const liquidityPointsHex = int2Hex(market.status.liquidityPoints, 8)
+
+  // console.log([
+  //   marketStatusHex,
+  //   oracleStatesHex,
+  //   marketVotesHex,
+  //   liquidityFeePoolHex,
+  //   accLiquidityFeePoolHex,
+  //   liquidityPointsHex,
+  //   marketBalanceHex,
+  //   marketBalanceMerkleRoot
+  // ])
 
   const marketDataHex =
     marketStatusHex +
@@ -306,14 +319,11 @@ export function getMarketBalance(entries: entry[], optionCount: number): balance
 }
 
 export function getBalanceMerkleRoot(entries: entry[]): hash {
-  return getMerkleRoot(entries.map(entry => sha256(getEntryHex(entry))))
+  return getMerkleRoot([sha256("00"), ...entries.map(entry => sha256(getEntryHex(entry)))])
 }
 
 export function getMerklePath(entries: entry[], position: number): string {
-  return getShaMerklePath(
-    position,
-    entries.map(entry => sha256(getEntryHex(entry)))
-  )
+  return getShaMerklePath(position + 1, [sha256("00"), ...entries.map(entry => sha256(getEntryHex(entry)))])
 }
 
 export function getMarketBalanceHex(entries: entry[], optionCount: number): string {
@@ -447,7 +457,10 @@ export function isValidMarketInit(market: marketInfo): boolean {
   return (
     !market.status.decided &&
     market.status.votes.reduce((a, b) => a + b, 0) === 0 &&
-    market.oracles.every(oracle => !oracle.committed && !oracle.voted)
+    market.oracles.every(oracle => !oracle.committed && !oracle.voted) &&
+    market.balance.liquidity === 0 &&
+    market.balance.shares.reduce((a, b) => a + b, 0) === 0 &&
+    market.balanceMerkleRoot === getMerkleRoot([sha256("00")])
   )
 }
 

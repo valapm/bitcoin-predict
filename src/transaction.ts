@@ -261,7 +261,7 @@ export function getAddEntryTx(
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
   const optionCount = prevMarket.details.options.length
 
-  const lastEntry = getEntryHex(prevEntries[prevEntries.length - 1])
+  const lastEntry = prevEntries.length ? getEntryHex(prevEntries[prevEntries.length - 1]) : "00"
   const lastMerklePath = getMerklePath(prevEntries, prevEntries.length - 1)
 
   const entry: entry = {
