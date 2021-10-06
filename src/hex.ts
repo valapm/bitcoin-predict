@@ -39,6 +39,20 @@ export function fromHex(s: string): string {
   return chars.map(char => String.fromCharCode(parseInt(char, 16))).join("")
 }
 
+/**
+ * Converts an ASM number representation to a number
+ * @param opcode OP_1 - OP_16 or hexadecimal number string
+ * @returns parsed number
+ */
+export function asm2Int(asm: string): number {
+  if (asm.startsWith("OP")) {
+    const numString = asm.split("_")[1]
+    return parseInt(numString)
+  } else {
+    return hex2Int(asm)
+  }
+}
+
 export function hex2Int(hex: string): number {
   return parseInt("0x" + reverseHex(hex), 16)
 }
