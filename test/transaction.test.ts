@@ -11,8 +11,10 @@ import {
   getOracleVoteTx,
   // getDebugParams,
   getFunctionID,
-  buildOracleBurnTx,
-  getOracleBurnUpdateTx
+  getOracleTx,
+  getOracleUpdateDetailsTx,
+  getOracleBurnTx,
+  isValidOracleInitTx
 } from "../src/transaction"
 import { RabinSignature, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
@@ -1152,20 +1154,38 @@ test("get function from script", () => {
   expect(getFunctionID(newTx.inputs[0].script)).toBe(1)
 })
 
-test("build and fund oracle burn transaction", () => {
-  const tx = buildOracleBurnTx(rabinPubKey1, 1000)
+test("build and fund oracle transaction", () => {
+  const tx = getOracleTx(rabinPubKey1)
   fundTx(tx, privateKey, address, utxos)
-  expect(tx.verify() === true && !tx.getSerializationError()).toBe(true)
+  expect(tx.verify() === true && !tx.getSerializationError() && isValidOracleInitTx(tx)).toBe(true)
 })
 
 test("build and fund oracle burn update transaction", () => {
-  const tx = buildOracleBurnTx(rabinPubKey1, 1000)
+  const tx = getOracleTx(rabinPubKey1)
   fundTx(tx, privateKey, address, utxos)
 
-  const tx2 = getOracleBurnUpdateTx(tx, 1000)
+  const tx2 = getOracleBurnTx(tx, 1000)
   fundTx(tx2, privateKey, address, utxos)
 
-  expect(tx2.outputs[0].satoshis).toBe(2000)
+  expect(tx2.outputs[0].satoshis).toBe(1000)
 
   expect(tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
+
+  const tx3 = getOracleBurnTx(tx, 1000)
+  fundTx(tx3, privateKey, address, utxos)
+
+  expect(tx3.outputs[0].satoshis).toBe(2000)
+
+  expect(tx3.verify() === true && !tx3.getSerializationError()).toBe(true)
+})
+
+test("build and fund oracle details update transaction", () => {
+  const tx = getOracleTx(rabinPubKey1)
+  fundTx(tx, privateKey, address, utxos)
+
+  const details = "Blablabla some details"
+
+  const tx2 = getOracleUpdateDetailsTx(tx, details, rabinPrivKey1)
+  expect(tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
+
 })

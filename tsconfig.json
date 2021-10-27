@@ -7,7 +7,8 @@
     "declaration": true,
     "sourceMap": true,
     "allowSyntheticDefaultImports" : true,
-    "esModuleInterop" : true
+    "esModuleInterop" : true,
+    "moduleResolution": "Node"
   },
   "include": ["./src"]
 }
