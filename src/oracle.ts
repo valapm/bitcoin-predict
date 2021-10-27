@@ -100,7 +100,14 @@ export function getSignature(message: string, privKey: rabinPrivKey): rabinSig {
 }
 
 interface oracleContract extends AbstractContract {
-  udpate(preimage: SigHashPreimage, action: number, details: Bytes, oracleSig: bigint, paddingCount: number, burnSats: number): FunctionCall
+  update(
+    preimage: SigHashPreimage,
+    action: number,
+    details: Bytes,
+    oracleSig: bigint,
+    paddingCount: number,
+    burnSats: number
+  ): FunctionCall
 }
 
 export function getOracleToken(pubKey: rabinPubKey): oracleContract {

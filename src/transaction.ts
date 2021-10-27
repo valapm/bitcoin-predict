@@ -36,7 +36,7 @@ import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt, hex2Int, t
 const feeb = 0.5
 
 // TODO: Is at 135 now, 0 @ end 2021
-const DUST = 546
+export const DUST = 546
 
 const Signature = bsv.crypto.Signature
 
@@ -196,13 +196,10 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
   }
 }
 
-export function isValidMarketUpdateTx(tx: bsv.Transaction, prevTx: bsv.Transaction, entries: entry[]): boolean {
+export function isValidUpdateTx(tx: bsv.Transaction, prevTx: bsv.Transaction): boolean {
   const lockingScript = prevTx.outputs[0].script
   const unlockingScript = tx.inputs[0].script
   const interpreter = bsv.Script.Interpreter()
-  // console.log(interpreter.verify(unlockingScript, lockingScript, tx, 0, DEFAULT_FLAGS, prevTx.outputs[0].satoshisBN))
-  // console.log(interpreter.errstr)
-  // console.log(interpreter.stack.slice(interpreter.stack.length - 3, interpreter.stack.length))
 
   const isValidScript = interpreter.verify(
     unlockingScript,
@@ -217,7 +214,11 @@ export function isValidMarketUpdateTx(tx: bsv.Transaction, prevTx: bsv.Transacti
     console.error(interpreter.errstr)
   }
 
-  return isValidScript && isValidMarketTx(tx, entries)
+  return isValidScript
+}
+
+export function isValidMarketUpdateTx(tx: bsv.Transaction, prevTx: bsv.Transaction, entries: entry[]): boolean {
+  return isValidUpdateTx(tx, prevTx) && isValidMarketTx(tx, entries)
 }
 
 export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean {
@@ -903,13 +904,18 @@ export function getOracleTx(pubKey: rabinPubKey): bsv.Transaction {
   return tx
 }
 
-export function getOracleUpdateTx(prevTx: bsv.Transaction, burnSats: number, details?: string, rabinPrivKey? :rabinPrivKey): bsv.Transaction {
+export function getOracleUpdateTx(
+  prevTx: bsv.Transaction,
+  burnSats: number,
+  details?: string,
+  rabinPrivKey?: rabinPrivKey
+): bsv.Transaction {
   const pubKeyHex = prevTx.outputs[0].script.toASM().split(" ")[3]
   const pubKey = hex2BigInt(pubKeyHex)
 
   const satoshis = prevTx.outputs[0].satoshis + burnSats
 
-  const detailsHex = details ? toHex(details): "00"
+  const detailsHex = details ? toHex(details) : "00"
   const detailsHash = sha256(detailsHex)
 
   const token = getOracleToken(pubKey)
@@ -943,41 +949,42 @@ export function getOracleUpdateTx(prevTx: bsv.Transaction, burnSats: number, det
     const sigContent = reverseHex(detailsHash)
     const signature = getOracleSig(sigContent, rabinPrivKey)
 
-    const unlockingScript = token.udpate(
-      new SigHashPreimage(preimage.toString("hex")), 
-      2,
-      new Bytes(detailsHex),
-      signature.signature,
-      signature.paddingByteCount,
-      burnSats).toScript() as bsv.Script
-  
-    newTx.inputs[0].setScript(unlockingScript)
+    const unlockingScript = token
+      .update(
+        new SigHashPreimage(preimage.toString("hex")),
+        2,
+        new Bytes(detailsHex),
+        signature.signature,
+        signature.paddingByteCount,
+        burnSats
+      )
+      .toScript() as bsv.Script
 
+    newTx.inputs[0].setScript(unlockingScript)
   } else {
-    const unlockingScript = token.udpate(
-      new SigHashPreimage(preimage.toString("hex")), 
-      2,
-      new Bytes(""),
-      0n,
-      0,
-      burnSats).toScript() as bsv.Script
-  
+    const unlockingScript = token
+      .update(new SigHashPreimage(preimage.toString("hex")), 2, new Bytes(""), 0n, 0, burnSats)
+      .toScript() as bsv.Script
+
     newTx.inputs[0].setScript(unlockingScript)
   }
 
   return newTx
 }
 
-
 export function getOracleBurnTx(prevTx: bsv.Transaction, burnSats: number): bsv.Transaction {
   return getOracleUpdateTx(prevTx, burnSats)
 }
 
-export function getOracleUpdateDetailsTx(prevTx: bsv.Transaction, details: string, rabinPrivKey: rabinPrivKey): bsv.Transaction {
+export function getOracleUpdateDetailsTx(
+  prevTx: bsv.Transaction,
+  details: string,
+  rabinPrivKey: rabinPrivKey
+): bsv.Transaction {
   return getOracleUpdateTx(prevTx, 0, details, rabinPrivKey)
 }
 
-export function isValidOracleInitTx(tx:bsv.Transaction): boolean {
-  const asm =  tx.outputs[0].script.toASM().split(" ")
-  return asm[asm.length -1] === sha256("00")
+export function isValidOracleInitTx(tx: bsv.Transaction): boolean {
+  const asm = tx.outputs[0].script.toASM().split(" ")
+  return asm[asm.length - 1] === sha256("00")
 }

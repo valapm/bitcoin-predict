@@ -14,7 +14,9 @@ import {
   getOracleTx,
   getOracleUpdateDetailsTx,
   getOracleBurnTx,
-  isValidOracleInitTx
+  isValidOracleInitTx,
+  isValidUpdateTx,
+  DUST
 } from "../src/transaction"
 import { RabinSignature, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
@@ -1167,16 +1169,16 @@ test("build and fund oracle burn update transaction", () => {
   const tx2 = getOracleBurnTx(tx, 1000)
   fundTx(tx2, privateKey, address, utxos)
 
-  expect(tx2.outputs[0].satoshis).toBe(1000)
+  expect(tx2.outputs[0].satoshis).toBe(1000 + DUST)
 
-  expect(tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
+  expect(isValidUpdateTx(tx2, tx) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
 
-  const tx3 = getOracleBurnTx(tx, 1000)
+  const tx3 = getOracleBurnTx(tx2, 1000)
   fundTx(tx3, privateKey, address, utxos)
 
-  expect(tx3.outputs[0].satoshis).toBe(2000)
+  expect(tx3.outputs[0].satoshis).toBe(2000 + DUST)
 
-  expect(tx3.verify() === true && !tx3.getSerializationError()).toBe(true)
+  expect(isValidUpdateTx(tx3, tx2) && tx3.verify() === true && !tx3.getSerializationError()).toBe(true)
 })
 
 test("build and fund oracle details update transaction", () => {
@@ -1186,6 +1188,5 @@ test("build and fund oracle details update transaction", () => {
   const details = "Blablabla some details"
 
   const tx2 = getOracleUpdateDetailsTx(tx, details, rabinPrivKey1)
-  expect(tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
-
+  expect(isValidUpdateTx(tx2, tx) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
 })
