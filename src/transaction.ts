@@ -907,7 +907,10 @@ export function getOracleTx(pubKey: rabinPubKey): bsv.Transaction {
 export function getOracleUpdateTx(
   prevTx: bsv.Transaction,
   burnSats: number,
-  details?: string,
+  details?: {
+    description?: string
+    domain: string
+  },
   rabinPrivKey?: rabinPrivKey
 ): bsv.Transaction {
   const pubKeyHex = prevTx.outputs[0].script.toASM().split(" ")[3]
@@ -915,11 +918,12 @@ export function getOracleUpdateTx(
 
   const satoshis = prevTx.outputs[0].satoshis + burnSats
 
-  const detailsHex = details ? toHex(details) : "00"
+  const detailsHex = details ? toHex(JSON.stringify(details)) : "00"
   const detailsHash = sha256(detailsHex)
 
   const token = getOracleToken(pubKey)
-  token.setDataPart(sha256("00"))
+
+  token.setDataPart(detailsHash)
 
   const newTx = new bsv.Transaction()
   newTx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis }))
@@ -946,13 +950,13 @@ export function getOracleUpdateTx(
   if (details) {
     if (!rabinPrivKey) throw new Error("Missing rabin private key")
 
-    const sigContent = reverseHex(detailsHash)
+    const sigContent = detailsHash
     const signature = getOracleSig(sigContent, rabinPrivKey)
 
     const unlockingScript = token
       .update(
         new SigHashPreimage(preimage.toString("hex")),
-        2,
+        details ? 1 : 2,
         new Bytes(detailsHex),
         signature.signature,
         signature.paddingByteCount,
@@ -978,7 +982,10 @@ export function getOracleBurnTx(prevTx: bsv.Transaction, burnSats: number): bsv.
 
 export function getOracleUpdateDetailsTx(
   prevTx: bsv.Transaction,
-  details: string,
+  details: {
+    description?: string
+    domain: string
+  },
   rabinPrivKey: rabinPrivKey
 ): bsv.Transaction {
   return getOracleUpdateTx(prevTx, 0, details, rabinPrivKey)

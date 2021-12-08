@@ -1185,7 +1185,9 @@ test("build and fund oracle details update transaction", () => {
   const tx = getOracleTx(rabinPubKey1)
   fundTx(tx, privateKey, address, utxos)
 
-  const details = "Blablabla some details"
+  const details = {
+    domain: "example.com"
+  }
 
   const tx2 = getOracleUpdateDetailsTx(tx, details, rabinPrivKey1)
   expect(isValidUpdateTx(tx2, tx) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
