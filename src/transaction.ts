@@ -1,4 +1,4 @@
-import { bsv, SigHashPreimage, Bytes, Sig, Ripemd160 } from "scryptlib"
+import { bsv, SigHashPreimage, Bytes, Sig, Ripemd160, buildContractClass } from "scryptlib"
 import {
   getMarketVersion,
   getMarketStatusfromHex,
@@ -16,7 +16,8 @@ import {
   voteCountByteLen,
   balanceTableByteLength,
   getSharesHex,
-  developerPayoutAddress
+  developerPayoutAddress,
+  getIndexToken
 } from "./pm"
 import {
   getOracleDetailsFromHex,
@@ -109,17 +110,29 @@ export function getUpdateMarketTx(
   return tx
 }
 
-export function getPreimage(prevTx: bsv.Transaction, newTx: bsv.Transaction, signSighash: number): Buffer {
+export function getPreimage(
+  prevTx: bsv.Transaction,
+  newTx: bsv.Transaction,
+  signSighash: number,
+  outputIndex = 0,
+  inputIndex = 0
+): Buffer {
   // TODO: Maybe prevTx could be replaced by a market
   // script could get generated using market.oracles
   const preimageBuf = bsv.Transaction.sighash.sighashPreimage(
     newTx,
     signSighash,
-    0,
-    prevTx.outputs[0].script,
-    prevTx.outputs[0].satoshisBN,
+    inputIndex,
+    prevTx.outputs[outputIndex].script,
+    prevTx.outputs[outputIndex].satoshisBN,
     DEFAULT_FLAGS
   )
+
+  // console.log(preimageBuf.toString("hex"))
+
+  // const asm = prevTx.outputs[outputIndex].script.toASM().split(" ")
+  // console.log(asm[asm.length - 1])
+
   return preimageBuf
 }
 
@@ -833,10 +846,16 @@ export function fundTx(
 ): bsv.Transaction {
   const inputCount = tx.inputs.length
 
-  const marketOutput = tx.outputs[0]
-  if (marketOutput.satoshis < DUST) {
-    marketOutput.satoshis = DUST
+  for (const output of tx.outputs) {
+    if (output.satoshis < DUST) {
+      output.satoshis = DUST
+    }
   }
+
+  // const marketOutput = tx.outputs[0]
+  // if (marketOutput.satoshis < DUST) {
+  //   marketOutput.satoshis = DUST
+  // }
 
   tx.feePerKb(satPerByte * 1000)
 
@@ -894,29 +913,100 @@ export function getFunctionID(script: bsv.Script): number {
 //   return JSON.stringify(tokenParams)
 // }
 
-export function getOracleTx(pubKey: rabinPubKey): bsv.Transaction {
+/**
+ * Adds Vala Index input and output to the transaction
+ */
+export function addValaIndex(
+  tx: bsv.Transaction,
+  prevValaIndexTx: bsv.Transaction,
+  prevValaIndexOutputIndex = 0
+): bsv.Transaction {
+  // console.log("index script length", prevValaIndexTx.outputs[prevValaIndexOutputIndex].script.toASM().length)
+  // console.log("index script index", prevValaIndexOutputIndex)
+  const indexToken = getIndexToken()
+
+  const input = bsv.Transaction.Input.fromObject({
+    prevTxId: prevValaIndexTx.hash,
+    outputIndex: prevValaIndexOutputIndex,
+    script: bsv.Script.empty(),
+    output: prevValaIndexTx.outputs[prevValaIndexOutputIndex]
+  })
+
+  input.clearSignatures = () => {} // eslint-disable-line
+  input.isFullySigned = () => true
+
+  tx.addInput(input)
+
+  const inputIndex = tx.inputs.length - 1
+
+  const satoshis = prevValaIndexTx.outputs[prevValaIndexOutputIndex].satoshis
+  const output = new bsv.Transaction.Output({ script: indexToken.lockingScript, satoshis })
+
+  if (inputIndex < tx.outputs.length) {
+    // With SIGHASH_SINGLE, output needs to be same index as input
+    tx.outputs.splice(inputIndex, 0, output)
+    tx._outputAmount = undefined
+    tx._updateChangeOutput()
+  } else {
+    tx.addOutput(output)
+  }
+
+  const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
+
+  // console.log(prevValaIndexOutputIndex)
+  // console.log(inputIndex)
+
+  const preimage = getPreimage(prevValaIndexTx, tx, sighashType, prevValaIndexOutputIndex, inputIndex)
+
+  // console.log("Preimage length:", preimage.toString("hex").length)
+  // console.log(preimage.toString("hex"))
+
+  const unlockingScript = indexToken.update(new SigHashPreimage(preimage.toString("hex"))).toScript() as bsv.Script
+
+  tx.inputs[inputIndex].setScript(unlockingScript)
+
+  return tx
+}
+
+export function getNewOracleTx(
+  pubKey: rabinPubKey,
+  prevValaIndexTx: bsv.Transaction,
+  prevValaIndexOutputIndex = 0
+): bsv.Transaction {
   const token = getOracleToken(pubKey)
+  token.setDataPart(sha256("00"))
+
+  const asm = token.lockingScript.toASM().split(" ")
+  console.log(asm[asm.length - 1])
+
   const tx = new bsv.Transaction()
   tx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis: DUST }))
 
   tx.feePerKb(feeb * 1000)
+
+  addValaIndex(tx, prevValaIndexTx, prevValaIndexOutputIndex)
+
+  // console.log(tx.inputs)
+  // console.log(tx.outputs)
+  // console.log(tx.toString())
 
   return tx
 }
 
 export function getOracleUpdateTx(
   prevTx: bsv.Transaction,
-  burnSats: number,
+  outputIndex = 0,
+  burnSats = 0,
   details?: {
     description?: string
     domain: string
   },
   rabinPrivKey?: rabinPrivKey
 ): bsv.Transaction {
-  const pubKeyHex = prevTx.outputs[0].script.toASM().split(" ")[3]
+  const pubKeyHex = prevTx.outputs[outputIndex].script.toASM().split(" ")[3]
   const pubKey = hex2BigInt(pubKeyHex)
 
-  const satoshis = prevTx.outputs[0].satoshis + burnSats
+  const satoshis = prevTx.outputs[outputIndex].satoshis + burnSats
 
   const detailsHex = details ? toHex(JSON.stringify(details)) : "00"
   const detailsHash = sha256(detailsHex)
@@ -930,11 +1020,14 @@ export function getOracleUpdateTx(
 
   newTx.feePerKb(feeb * 1000)
 
+  // console.log(prevTx.outputs)
+  // console.log(outputIndex)
+
   const input = bsv.Transaction.Input.fromObject({
     prevTxId: prevTx.hash,
-    outputIndex: 0,
+    outputIndex: outputIndex,
     script: bsv.Script.empty(),
-    output: prevTx.outputs[0] // prevTx of newTx here?
+    output: prevTx.outputs[outputIndex] // prevTx of newTx here?
   })
 
   input.clearSignatures = () => {} // eslint-disable-line
@@ -943,9 +1036,9 @@ export function getOracleUpdateTx(
   newTx.addInput(input)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
-  const preimage = getPreimage(prevTx, newTx, sighashType)
+  const preimage = getPreimage(prevTx, newTx, sighashType, outputIndex)
 
-  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
+  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[outputIndex].satoshis }
 
   if (details) {
     if (!rabinPrivKey) throw new Error("Missing rabin private key")
@@ -970,28 +1063,38 @@ export function getOracleUpdateTx(
       .update(new SigHashPreimage(preimage.toString("hex")), 2, new Bytes(""), 0n, 0, burnSats)
       .toScript() as bsv.Script
 
+    // console.log([
+    //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
+    //   2,
+    //   new Bytes("").toLiteral(),
+    //   0n,
+    //   0,
+    //   burnSats
+    // ])
+
     newTx.inputs[0].setScript(unlockingScript)
   }
 
   return newTx
 }
 
-export function getOracleBurnTx(prevTx: bsv.Transaction, burnSats: number): bsv.Transaction {
-  return getOracleUpdateTx(prevTx, burnSats)
+export function getOracleBurnTx(prevTx: bsv.Transaction, burnSats: number, outputIndex = 0): bsv.Transaction {
+  return getOracleUpdateTx(prevTx, outputIndex, burnSats)
 }
 
 export function getOracleUpdateDetailsTx(
   prevTx: bsv.Transaction,
+  outputIndex = 0,
   details: {
     description?: string
     domain: string
   },
   rabinPrivKey: rabinPrivKey
 ): bsv.Transaction {
-  return getOracleUpdateTx(prevTx, 0, details, rabinPrivKey)
+  return getOracleUpdateTx(prevTx, outputIndex, 0, details, rabinPrivKey)
 }
 
-export function isValidOracleInitTx(tx: bsv.Transaction): boolean {
-  const asm = tx.outputs[0].script.toASM().split(" ")
+export function isValidOracleInitTx(tx: bsv.Transaction, outputIndex = 0): boolean {
+  const asm = tx.outputs[outputIndex].script.toASM().split(" ")
   return asm[asm.length - 1] === sha256("00")
 }

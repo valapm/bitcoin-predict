@@ -40,6 +40,8 @@ export const versions: version[] = [
   }
 ]
 
+const valaIndexContract = "935ec6b78a842b25fb12b353f8a204c7"
+
 interface PM extends AbstractContract {
   updateMarket(
     preimage: SigHashPreimage,
@@ -63,6 +65,10 @@ interface PM extends AbstractContract {
     paddingCount: number,
     oracleDecision: number
   ): FunctionCall
+}
+
+interface Index extends AbstractContract {
+  update(preimage: SigHashPreimage): FunctionCall
 }
 
 export type option = {
@@ -244,6 +250,11 @@ export function getToken(market: marketInfo): PM {
   // console.log(`${market.version} ${marketDetailsHex} ${marketDataHex}`)
 
   return token
+}
+
+export function getIndexToken(): Index {
+  const ValaIndexToken = buildContractClass(require(`../scripts/${valaIndexContract}.json`)) // eslint-disable-line
+  return new ValaIndexToken() as Index // eslint-disable-line
 }
 
 export function getVotesHex(votes: number[]): string {

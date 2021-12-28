@@ -11,7 +11,7 @@ import {
   getOracleVoteTx,
   // getDebugParams,
   getFunctionID,
-  getOracleTx,
+  getNewOracleTx,
   getOracleUpdateDetailsTx,
   getOracleBurnTx,
   isValidOracleInitTx,
@@ -26,10 +26,11 @@ import {
   marketInfo,
   getNewMarket,
   creatorInfo,
-  marketDetails
+  marketDetails,
+  getIndexToken
 } from "../src/pm"
 import { balance } from "../src/lmsr"
-import { bsv } from "scryptlib"
+import bsv from "bsv"
 import { getSignature, oracleDetail } from "../src/oracle"
 import { cloneDeep } from "lodash"
 
@@ -81,6 +82,10 @@ let oracleDetails: oracleDetail[],
   marketDetails: marketDetails,
   market: marketInfo,
   populatedMarket: marketInfo
+
+const valaIndexToken = getIndexToken()
+const valaIndexTx = new bsv.Transaction()
+valaIndexTx.addOutput(new bsv.Transaction.Output({ script: valaIndexToken.lockingScript, satoshis: DUST }))
 
 beforeEach(() => {
   oracleDetails = [
@@ -1157,21 +1162,46 @@ test("get function from script", () => {
 })
 
 test("build and fund oracle transaction", () => {
-  const tx = getOracleTx(rabinPubKey1)
+  const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
   expect(tx.verify() === true && !tx.getSerializationError() && isValidOracleInitTx(tx)).toBe(true)
 })
 
+test("Add multiple oracles to vala index", () => {
+  const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
+  fundTx(tx, privateKey, address, utxos)
+  const tx2 = getNewOracleTx(rabinPubKey1, tx)
+  fundTx(tx2, privateKey, address, utxos)
+  console.log(tx2.toString())
+  expect(isValidUpdateTx(tx2, tx) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
+})
+
 test("build and fund oracle burn update transaction", () => {
-  const tx = getOracleTx(rabinPubKey1)
+  const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
+
   fundTx(tx, privateKey, address, utxos)
 
-  const tx2 = getOracleBurnTx(tx, 1000)
+  const tx2 = getOracleBurnTx(tx, 1000, 1)
   fundTx(tx2, privateKey, address, utxos)
 
-  expect(tx2.outputs[0].satoshis).toBe(1000 + DUST)
+  // console.log(tx2.outputs)
 
-  expect(isValidUpdateTx(tx2, tx) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
+  // const asm = tx2.outputs[1].script.toASM().split(" ")
+  // console.log(tx2.outputs[0].script.toASM())
+  // console.log(asm.slice(asm.length - 3, asm.length))
+  // console.log(tx2.inputs)
+  // console.log(tx.outputs)
+  console.log(tx2.toString())
+  // console.log(rabinPubKey1)
+  // const asm = tx.outputs[0].script.toASM().split(" ")
+  // console.log(asm.slice(asm.length - 3, asm.length))
+  // const asm2 = tx2.outputs[0].script.toASM().split(" ")
+  // console.log(asm2.slice(asm2.length - 3, asm2.length))
+
+  expect(tx2.outputs[0].satoshis).toBe(1000 + DUST)
+  expect(tx2.getSerializationError()).toBe(undefined)
+  expect(tx2.verify()).toBe(true)
+  expect(isValidUpdateTx(tx2, tx)).toBe(true)
 
   const tx3 = getOracleBurnTx(tx2, 1000)
   fundTx(tx3, privateKey, address, utxos)
@@ -1182,13 +1212,13 @@ test("build and fund oracle burn update transaction", () => {
 })
 
 test("build and fund oracle details update transaction", () => {
-  const tx = getOracleTx(rabinPubKey1)
+  const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
   const details = {
     domain: "example.com"
   }
 
-  const tx2 = getOracleUpdateDetailsTx(tx, details, rabinPrivKey1)
+  const tx2 = getOracleUpdateDetailsTx(tx, 0, details, rabinPrivKey1)
   expect(isValidUpdateTx(tx2, tx) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
 })
