@@ -1164,7 +1164,7 @@ test("get function from script", () => {
 test("build and fund oracle transaction", () => {
   const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
-  expect(tx.verify() === true && !tx.getSerializationError() && isValidOracleInitTx(tx)).toBe(true)
+  expect(tx.verify() === true && !tx.getSerializationError() && isValidOracleInitTx(tx, 1)).toBe(true)
 })
 
 test("Add multiple oracles to vala index", () => {
@@ -1172,7 +1172,7 @@ test("Add multiple oracles to vala index", () => {
   fundTx(tx, privateKey, address, utxos)
   const tx2 = getNewOracleTx(rabinPubKey1, tx)
   fundTx(tx2, privateKey, address, utxos)
-  console.log(tx2.toString())
+  // console.log(tx2.toString())
   expect(isValidUpdateTx(tx2, tx) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
 })
 
@@ -1191,7 +1191,7 @@ test("build and fund oracle burn update transaction", () => {
   // console.log(asm.slice(asm.length - 3, asm.length))
   // console.log(tx2.inputs)
   // console.log(tx.outputs)
-  console.log(tx2.toString())
+  // console.log(tx2.toString())
   // console.log(rabinPubKey1)
   // const asm = tx.outputs[0].script.toASM().split(" ")
   // console.log(asm.slice(asm.length - 3, asm.length))
@@ -1201,7 +1201,7 @@ test("build and fund oracle burn update transaction", () => {
   expect(tx2.outputs[0].satoshis).toBe(1000 + DUST)
   expect(tx2.getSerializationError()).toBe(undefined)
   expect(tx2.verify()).toBe(true)
-  expect(isValidUpdateTx(tx2, tx)).toBe(true)
+  expect(isValidUpdateTx(tx2, tx, 1)).toBe(true)
 
   const tx3 = getOracleBurnTx(tx2, 1000)
   fundTx(tx3, privateKey, address, utxos)
@@ -1219,6 +1219,6 @@ test("build and fund oracle details update transaction", () => {
     domain: "example.com"
   }
 
-  const tx2 = getOracleUpdateDetailsTx(tx, 0, details, rabinPrivKey1)
-  expect(isValidUpdateTx(tx2, tx) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
+  const tx2 = getOracleUpdateDetailsTx(tx, 1, details, rabinPrivKey1)
+  expect(isValidUpdateTx(tx2, tx, 1) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
 })

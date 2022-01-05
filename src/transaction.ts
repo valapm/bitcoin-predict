@@ -209,18 +209,27 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
   }
 }
 
-export function isValidUpdateTx(tx: bsv.Transaction, prevTx: bsv.Transaction): boolean {
-  const lockingScript = prevTx.outputs[0].script
-  const unlockingScript = tx.inputs[0].script
+export function isValidUpdateTx(
+  tx: bsv.Transaction,
+  prevTx: bsv.Transaction,
+  outputIndex = 0,
+  inputIndex = 0
+): boolean {
+  const lockingScript = prevTx.outputs[outputIndex].script
+  const unlockingScript = tx.inputs[inputIndex].script
   const interpreter = bsv.Script.Interpreter()
+
+  // console.log(prevTx.outputs)
+  // console.log(tx.inputs)
+  // console.log(DEFAULT_FLAGS)
 
   const isValidScript = interpreter.verify(
     unlockingScript,
     lockingScript,
     tx,
-    0,
+    inputIndex,
     DEFAULT_FLAGS,
-    prevTx.outputs[0].satoshisBN
+    prevTx.outputs[outputIndex].satoshisBN
   )
 
   if (!isValidScript) {
@@ -332,7 +341,7 @@ export function getAddEntryTx(
       0,
       0
     )
-    .toScript() as bsv.Script
+    .toScript()
 
   // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
 
@@ -571,7 +580,7 @@ export function getUpdateEntryTx(
       0,
       0
     )
-    .toScript() as bsv.Script
+    .toScript()
 
   // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
 
@@ -607,7 +616,9 @@ export function getUpdateEntryTx(
   // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
 
   // const asm = newTx.outputs[0].script.toASM().split(" ")
-  // console.log(asm[asm.length - 1])
+  // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
+
+  // console.log(newTx.outputs)
 
   return newTx
 }
@@ -678,7 +689,7 @@ export function getOracleCommitTx(
       signature.paddingByteCount,
       0
     )
-    .toScript() as bsv.Script
+    .toScript()
 
   // console.log([
   //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
@@ -793,7 +804,7 @@ export function getOracleVoteTx(
       signature.paddingByteCount,
       vote
     )
-    .toScript() as bsv.Script
+    .toScript()
 
   // console.log([
   //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
@@ -961,7 +972,7 @@ export function addValaIndex(
   // console.log("Preimage length:", preimage.toString("hex").length)
   // console.log(preimage.toString("hex"))
 
-  const unlockingScript = indexToken.update(new SigHashPreimage(preimage.toString("hex"))).toScript() as bsv.Script
+  const unlockingScript = indexToken.update(new SigHashPreimage(preimage.toString("hex"))).toScript()
 
   tx.inputs[inputIndex].setScript(unlockingScript)
 
@@ -977,7 +988,7 @@ export function getNewOracleTx(
   token.setDataPart(sha256("00"))
 
   const asm = token.lockingScript.toASM().split(" ")
-  console.log(asm[asm.length - 1])
+  // console.log(asm[asm.length - 1])
 
   const tx = new bsv.Transaction()
   tx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis: DUST }))
@@ -1055,13 +1066,13 @@ export function getOracleUpdateTx(
         signature.paddingByteCount,
         burnSats
       )
-      .toScript() as bsv.Script
+      .toScript()
 
     newTx.inputs[0].setScript(unlockingScript)
   } else {
     const unlockingScript = token
       .update(new SigHashPreimage(preimage.toString("hex")), 2, new Bytes(""), 0n, 0, burnSats)
-      .toScript() as bsv.Script
+      .toScript()
 
     // console.log([
     //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),

@@ -25,7 +25,7 @@ export type version = {
 // Keep track of old versions for compatibility.
 export const versions: version[] = [
   {
-    identifier: "c07e3444ddbb247423196e2c86697fe0",
+    identifier: "97281a1a2fd6499a1ddb749c9e701932",
     version: "0.3.7",
     oracleKeyPos: 14,
     globalOptionCountPos: 15,

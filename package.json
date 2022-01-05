@@ -48,9 +48,9 @@
     "@types/lodash": "^4.14.170",
     "@types/node": "^14.17.2",
     "@types/node-fetch": "^2.5.10",
-    "bsv": "github:valapm/bsv#4c01ffb90893ef44fcba9c3b4b65b29e0c303dce",
+    "bsv": "github:valapm/bsv#5c5e99df787c2a8c2fb5565b88060a69cd93a9cd",
     "node-fetch": "^2.6.1",
     "rabinsig": "github:sCrypt-Inc/rabin#4a25e31f8289b6cfd4808564e27c0f51730324a9",
-    "scryptlib": "^0.4.6"
+    "scryptlib": "^0.10.4"
   }
 }
