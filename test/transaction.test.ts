@@ -16,7 +16,8 @@ import {
   getOracleBurnTx,
   isValidOracleInitTx,
   isValidUpdateTx,
-  DUST
+  DUST,
+  getNewMarketTx
 } from "../src/transaction"
 import { RabinSignature, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
@@ -130,12 +131,12 @@ beforeEach(() => {
 })
 
 test("Convert from and to market hex", () => {
-  const tx = buildTx(market)
-  const parsedMarket = getMarketFromScript(tx.outputs[0].script)
-  const tx2 = buildTx(parsedMarket)
+  const tx = getNewMarketTx(market, valaIndexTx)
+  const parsedMarket = getMarketFromScript(tx.outputs[1].script)
+  const tx2 = getNewMarketTx(parsedMarket, valaIndexTx)
 
-  const asm1 = tx.outputs[0].script.toASM()
-  const asm2 = tx2.outputs[0].script.toASM()
+  const asm1 = tx.outputs[1].script.toASM()
+  const asm2 = tx2.outputs[1].script.toASM()
 
   const opReturn1 = asm1.split(" ").slice(asm1.length - 3, asm1.length)
   const opReturn2 = asm2.split(" ").slice(asm2.length - 3, asm2.length)
@@ -145,21 +146,21 @@ test("Convert from and to market hex", () => {
 })
 
 test("build and fund pm init transaction", () => {
-  const tx = buildTx(market)
+  const tx = getNewMarketTx(market, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
-  expect(isValidMarketTx(tx, [])).toBe(true)
+  expect(isValidMarketTx(tx, [], 1)).toBe(true)
 })
 
 test("convert between market and script consistency", () => {
-  const tx = buildTx(market)
-  const extractedMarket = getMarketFromScript(tx.outputs[0].script)
-  const tx2 = buildTx(extractedMarket)
+  const tx = getNewMarketTx(market, valaIndexTx)
+  const extractedMarket = getMarketFromScript(tx.outputs[1].script)
+  const tx2 = getNewMarketTx(extractedMarket, valaIndexTx)
 
-  expect(tx2.outputs[0].script.toASM()).toBe(tx.outputs[0].script.toASM())
+  expect(tx2.outputs[1].script.toASM()).toBe(tx.outputs[1].script.toASM())
 })
 
 test("add entry", () => {
-  const tx = buildTx(market)
+  const tx = getNewMarketTx(market, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
   const publicKey = privateKey.publicKey
@@ -168,7 +169,7 @@ test("add entry", () => {
     shares: [1, 0, 2]
   }
 
-  const newTx = getAddEntryTx(tx, [], publicKey, balance, marketCreator.payoutAddress, utxos, privateKey)
+  const newTx = getAddEntryTx(tx, [], publicKey, balance, marketCreator.payoutAddress, utxos, privateKey, 1)
 
   const newEntries = [
     {
@@ -179,11 +180,11 @@ test("add entry", () => {
     }
   ]
 
-  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries, 1)).toBe(true)
 })
 
 test("add entry with liquidity", () => {
-  const tx = buildTx(market)
+  const tx = getNewMarketTx(market, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
   const publicKey = privateKey.publicKey
@@ -192,7 +193,7 @@ test("add entry with liquidity", () => {
     shares: [1, 0, 2]
   }
 
-  const newTx = getAddEntryTx(tx, [], publicKey, balance, marketCreator.payoutAddress, utxos, privateKey)
+  const newTx = getAddEntryTx(tx, [], publicKey, balance, marketCreator.payoutAddress, utxos, privateKey, 1)
 
   const newEntries = [
     {
@@ -203,7 +204,7 @@ test("add entry with liquidity", () => {
     }
   ]
 
-  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries, 1)).toBe(true)
 })
 
 test("update entry", () => {
@@ -321,15 +322,15 @@ test("update to invalid balance", () => {
   ).toThrow()
 })
 
-test("oracle commmitment", () => {
-  const tx = buildTx(populatedMarket)
+test("oracle commitment", () => {
+  const tx = getNewMarketTx(populatedMarket, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
-  const newTx = getOracleCommitTx(tx, rabinPrivKey1, address, utxos, privateKey)
+  const newTx = getOracleCommitTx(tx, rabinPrivKey1, address, utxos, privateKey, 1)
   const newMarket = getMarketFromScript(newTx.outputs[0].script)
 
   expect(newMarket.oracles[0].committed).toBe(true)
-  expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
+  expect(isValidMarketUpdateTx(newTx, tx, entries, 1)).toBe(true)
 })
 
 test("oracle vote succeeds", () => {
@@ -863,9 +864,9 @@ test("liquidity points redeeming", () => {
 test("full market graph", () => {
   // Create market
 
-  const tx = buildTx(populatedMarket)
+  const tx = getNewMarketTx(populatedMarket, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
-  expect(isValidMarketTx(tx, entries)).toBe(true)
+  expect(isValidMarketTx(tx, entries, 1)).toBe(true)
 
   // Add entry
 
@@ -889,12 +890,13 @@ test("full market graph", () => {
     entry2.balance,
     marketCreator.payoutAddress,
     utxos,
-    privateKey
+    privateKey,
+    1
   )
 
   const entries2 = entries.concat([entry2])
 
-  expect(isValidMarketUpdateTx(tx2, tx, entries2)).toBe(true)
+  expect(isValidMarketUpdateTx(tx2, tx, entries2, 1)).toBe(true)
 
   // Update entry - buy
 

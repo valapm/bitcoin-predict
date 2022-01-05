@@ -88,18 +88,29 @@ export function buildTx(market: marketInfo): bsv.Transaction {
   return tx
 }
 
+export function getNewMarketTx(
+  market: marketInfo,
+  prevValaIndexTx: bsv.Transaction,
+  prevValaIndexOutputIndex = 0
+): bsv.Transaction {
+  const tx = buildTx(market)
+  addValaIndex(tx, prevValaIndexTx, prevValaIndexOutputIndex)
+  return tx
+}
+
 export function getUpdateMarketTx(
   prevTx: bsv.Transaction,
   market: marketInfo,
+  outputIndex = 0,
   unlockingScript: bsv.Script = bsv.Script.empty()
 ): bsv.Transaction {
   const tx = buildTx(market)
 
   const input = bsv.Transaction.Input.fromObject({
     prevTxId: prevTx.hash,
-    outputIndex: 0,
+    outputIndex,
     script: unlockingScript,
-    output: prevTx.outputs[0] // prevTx of newTx here?
+    output: prevTx.outputs[outputIndex] // prevTx of newTx here?
   })
 
   input.clearSignatures = () => {}
@@ -239,13 +250,19 @@ export function isValidUpdateTx(
   return isValidScript
 }
 
-export function isValidMarketUpdateTx(tx: bsv.Transaction, prevTx: bsv.Transaction, entries: entry[]): boolean {
-  return isValidUpdateTx(tx, prevTx) && isValidMarketTx(tx, entries)
+export function isValidMarketUpdateTx(
+  tx: bsv.Transaction,
+  prevTx: bsv.Transaction,
+  entries: entry[],
+  outputIndex = 0,
+  inputIndex = 0
+): boolean {
+  return isValidUpdateTx(tx, prevTx, outputIndex, inputIndex) && isValidMarketTx(tx, entries, 0)
 }
 
-export function isValidMarketTx(tx: bsv.Transaction, entries: entry[]): boolean {
-  const script = tx.outputs[0].script
-  const balance = tx.outputs[0].satoshis
+export function isValidMarketTx(tx: bsv.Transaction, entries: entry[], outputIndex = 0): boolean {
+  const script = tx.outputs[outputIndex].script
+  const balance = tx.outputs[outputIndex].satoshis
   const market = getMarketFromScript(script)
 
   // FIXME: This is probably be removed. Script verifies it all.
@@ -279,9 +296,10 @@ export function getAddEntryTx(
   payoutAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[],
   spendingPrivKey: bsv.PrivateKey,
+  outputIndex = 0,
   feePerByte: number = feeb
 ): bsv.Transaction {
-  const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
+  const prevMarket = getMarketFromScript(prevTx.outputs[outputIndex].script)
   const optionCount = prevMarket.details.options.length
 
   const lastEntry = prevEntries.length ? getEntryHex(prevEntries[prevEntries.length - 1]) : "00"
@@ -303,20 +321,20 @@ export function getAddEntryTx(
     balanceMerkleRoot: getMerkleRoot(newEntries)
   }
 
-  const newTx = getUpdateMarketTx(prevTx, newMarket)
+  const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex)
 
   fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID
 
-  const preimage = getPreimage(prevTx, newTx, sighashType)
+  const preimage = getPreimage(prevTx, newTx, sighashType, outputIndex)
 
   const changeOutput = newTx.getChangeOutput()
   const changeSats = changeOutput ? changeOutput.satoshis : 0
 
   const token = getToken(prevMarket)
 
-  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
+  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[outputIndex].satoshis }
 
   const unlockingScript = token
     .updateMarket(
@@ -629,11 +647,12 @@ export function getOracleCommitTx(
   payoutAddress: bsv.Address,
   utxos: bsv.Transaction.UnspentOutput[],
   spendingPrivKey: bsv.PrivateKey,
+  outputIndex = 0,
   feePerByte: number = feeb
 ): bsv.Transaction {
   // TODO: Offer option to fund transaction separately?
 
-  const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
+  const prevMarket = getMarketFromScript(prevTx.outputs[outputIndex].script)
   const token = getToken(prevMarket)
 
   const rabin = new RabinSignature()
@@ -655,16 +674,16 @@ export function getOracleCommitTx(
     oracles: newOracles
   }
 
-  const newTx = getUpdateMarketTx(prevTx, newMarket)
+  const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex)
 
   const sigContent = commitmentHash + reverseHex(prevTx.hash)
   const signature = getOracleSig(sigContent, rabinPrivKey)
   const signatureBytes = int2Hex(signature.signature)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
-  const preimage = getPreimage(prevTx, newTx, sighashType)
+  const preimage = getPreimage(prevTx, newTx, sighashType, outputIndex)
 
-  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
+  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[outputIndex].satoshis }
 
   const unlockingScript = token
     .updateMarket(
@@ -987,7 +1006,7 @@ export function getNewOracleTx(
   const token = getOracleToken(pubKey)
   token.setDataPart(sha256("00"))
 
-  const asm = token.lockingScript.toASM().split(" ")
+  // const asm = token.lockingScript.toASM().split(" ")
   // console.log(asm[asm.length - 1])
 
   const tx = new bsv.Transaction()
