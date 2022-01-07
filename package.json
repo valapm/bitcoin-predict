@@ -50,7 +50,8 @@
     "@types/node-fetch": "^2.5.10",
     "bsv": "github:valapm/bsv#5c5e99df787c2a8c2fb5565b88060a69cd93a9cd",
     "node-fetch": "^2.6.1",
+    "process": "^0.11.10",
     "rabinsig": "github:sCrypt-Inc/rabin#4a25e31f8289b6cfd4808564e27c0f51730324a9",
-    "scryptlib": "^0.10.4"
+    "scryptlib": "github:valapm/scryptlib#6f3f247a954ce32b14f13421925ff1cfaa8b7b22"
   }
 }

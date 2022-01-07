@@ -39,6 +39,9 @@ module.exports = {
   },
   plugins: [
     // new webpack.IgnorePlugin({ resourceRegExp: /child_process$/ }),
-    new webpack.IgnorePlugin({ resourceRegExp: /predictionMarket.scrypt$/ })
+    new webpack.IgnorePlugin({ resourceRegExp: /predictionMarket.scrypt$/ }),
+    new webpack.ProvidePlugin({
+      process: "process/browser"
+    })
   ]
 }
