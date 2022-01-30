@@ -6,39 +6,7 @@ import { oracleDetail, getOracleDetailsHex, isValidOracleDetails, getOracleState
 import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
 import { ContractDescription, AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
-
-export type version = {
-  identifier: string
-  version: string
-  oracleKeyPos: number
-  globalOptionCountPos: number
-  requiredVotesPos: number
-  creatorPubKeyPos: number
-  creatorPayoutAddressPos: number
-  creatorFeePos: number
-  liquidityFeeRatePos: number
-  maxOptionCount: number
-  maxOracleCount: number
-  devFee: number
-}
-
-// Keep track of old versions for compatibility.
-export const versions: version[] = [
-  {
-    identifier: "97281a1a2fd6499a1ddb749c9e701932",
-    version: "0.3.7",
-    oracleKeyPos: 14,
-    globalOptionCountPos: 15,
-    requiredVotesPos: 16,
-    creatorPubKeyPos: 17,
-    creatorPayoutAddressPos: 18,
-    creatorFeePos: 19,
-    liquidityFeeRatePos: 20,
-    maxOptionCount: 6,
-    maxOracleCount: 3,
-    devFee: 0.2
-  }
-]
+import { marketContracts, marketVersion } from "./contracts"
 
 const valaIndexContract = "935ec6b78a842b25fb12b353f8a204c7"
 
@@ -148,8 +116,8 @@ export const developerPayoutAddress = "00ae2c80a6e4bd7a01a0c8e6679f888234efac02b
 //   return asmTemplate
 // }
 
-export function getMarketVersion(identifier: string): version {
-  const version = versions.find(version => version.identifier === identifier)
+export function getMarketVersion(identifier: string): marketVersion {
+  const version = marketContracts.find(version => version.identifier === identifier)
   if (!version) throw new Error("Market version not supported")
   return version
 }
@@ -175,7 +143,7 @@ export function getNewMarket(
   const status = { decided: false, decision: 0, votes, liquidityFeePool: 0, accLiquidityFeePool: 0, liquidityPoints: 0 }
 
   return {
-    version: versions[0].identifier,
+    version: marketContracts[0].identifier,
     details,
     status,
     oracles,
@@ -313,8 +281,9 @@ export function getSharesFromHex(bytes: string): number[] {
   return hex2IntArray(bytes)
 }
 
-export function getBalanceHexLength(version: version, script: bsv.Script): number {
-  return parseInt(script.toASM()[version.globalOptionCountPos], 16) * 2
+export function getBalanceHexLength(version: marketVersion, script: bsv.Script): number {
+  const optionCountPos = version.args.findIndex(arg => arg === "globalOptionCount") + version.argPos
+  return parseInt(script.toASM()[optionCountPos], 16) * 2
 }
 
 export function getMarketBalance(entries: entry[], optionCount: number): balance {

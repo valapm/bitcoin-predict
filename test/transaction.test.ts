@@ -14,10 +14,11 @@ import {
   getNewOracleTx,
   getOracleUpdateDetailsTx,
   getOracleBurnTx,
-  isValidOracleInitTx,
   isValidUpdateTx,
   DUST,
-  getNewMarketTx
+  getNewMarketTx,
+  isValidMarketInitOutput,
+  isValidOracleInitOutput
 } from "../src/transaction"
 import { RabinSignature, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
@@ -149,6 +150,16 @@ test("build and fund pm init transaction", () => {
   const tx = getNewMarketTx(market, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
   expect(isValidMarketTx(tx, [], 1)).toBe(true)
+  expect(isValidMarketInitOutput(tx, 1)).toBe(true)
+})
+
+test("throw at invalid transaction", () => {
+  const tx = getNewMarketTx(market, valaIndexTx)
+  fundTx(tx, privateKey, address, utxos)
+
+  tx.outputs[1].script.chunks.splice(30, 1)
+
+  expect(isValidMarketInitOutput(tx, 1)).toBe(false)
 })
 
 test("convert between market and script consistency", () => {
@@ -1166,7 +1177,9 @@ test("get function from script", () => {
 test("build and fund oracle transaction", () => {
   const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
-  expect(tx.verify() === true && !tx.getSerializationError() && isValidOracleInitTx(tx, 1)).toBe(true)
+  expect(tx.verify()).toBe(true)
+  expect(!tx.getSerializationError()).toBe(true)
+  expect(isValidOracleInitOutput(tx, 1)).toBe(true)
 })
 
 test("Add multiple oracles to vala index", () => {

@@ -18,6 +18,7 @@
   "devDependencies": {
     "@tsconfig/node16": "^1.0.2",
     "@types/jest": "^27.0.3",
+    "@types/md5": "^2.3.1",
     "@typescript-eslint/eslint-plugin": "^4.26.0",
     "@typescript-eslint/parser": "^4.26.0",
     "assert": "^2.0.0",
@@ -48,7 +49,8 @@
     "@types/lodash": "^4.14.170",
     "@types/node": "^14.17.2",
     "@types/node-fetch": "^2.5.10",
-    "bsv": "github:valapm/bsv#5c5e99df787c2a8c2fb5565b88060a69cd93a9cd",
+    "bsv": "github:valapm/bsv#1e7036e5b41e34097b94340f620386df38c9cee0",
+    "md5": "^2.3.0",
     "node-fetch": "^2.6.1",
     "process": "^0.11.10",
     "rabinsig": "github:sCrypt-Inc/rabin#4a25e31f8289b6cfd4808564e27c0f51730324a9",

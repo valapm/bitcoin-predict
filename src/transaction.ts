@@ -17,7 +17,8 @@ import {
   balanceTableByteLength,
   getSharesHex,
   developerPayoutAddress,
-  getIndexToken
+  getIndexToken,
+  isValidMarketInit
 } from "./pm"
 import {
   getOracleDetailsFromHex,
@@ -33,6 +34,8 @@ import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinPrivKey, RabinSignature, rabinPubKey } from "rabinsig"
 import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt, hex2Int, toHex } from "./hex"
+import { version, marketContracts, oracleContracts, getArgPos } from "./contracts"
+import md5 from "md5"
 
 const feeb = 0.5
 
@@ -153,10 +156,12 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
   const stateData = opReturnData[2]
   const version = getMarketVersion(opReturnData[0])
 
-  const oracleKeysHex = asm[version.oracleKeyPos]
+  const oracleKeyPos = getArgPos(version, "oracleKey")
+  const oracleKeysHex = asm[oracleKeyPos]
   const oracleCount = oracleKeysHex.length / (oracleInfoByteLength * 2)
 
-  const globalOptionCount = getIntFromOP(asm[version.globalOptionCountPos])
+  const globalOptionCountPos = getArgPos(version, "globalOptionCount")
+  const globalOptionCount = getIntFromOP(asm[globalOptionCountPos])
 
   const balanceTableRootPos = stateData.length - balanceTableByteLength * 2
   const balanceTableRoot = stateData.slice(balanceTableRootPos)
@@ -211,12 +216,12 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
     },
     balanceMerkleRoot: balanceTableRoot,
     creator: {
-      pubKey: bsv.PublicKey.fromHex(asm[version.creatorPubKeyPos]),
-      payoutAddress: bsv.Address.fromHex("00" + asm[version.creatorPayoutAddressPos])
+      pubKey: bsv.PublicKey.fromHex(asm[getArgPos(version, "creatorPubKey")]),
+      payoutAddress: bsv.Address.fromHex("00" + asm[getArgPos(version, "creatorPayoutAddress")])
     },
-    creatorFee: getIntFromOP(asm[version.creatorFeePos]) / 100,
-    requiredVotes: getIntFromOP(asm[version.requiredVotesPos]),
-    liquidityFee: getIntFromOP(asm[version.liquidityFeeRatePos]) / 100
+    creatorFee: getIntFromOP(asm[getArgPos(version, "creatorFee")]) / 100,
+    requiredVotes: getIntFromOP(asm[getArgPos(version, "requiredVotes")]),
+    liquidityFee: getIntFromOP(asm[getArgPos(version, "liquidityFeeRate")]) / 100
   }
 }
 
@@ -553,7 +558,7 @@ export function getUpdateEntryTx(
   if (redeemSats > 0) {
     const version = getMarketVersion(prevMarket.version)
 
-    const developerSatFee = Math.floor((version.devFee * redeemSats) / 100)
+    const developerSatFee = Math.floor((version.options.devFee * redeemSats) / 100)
     const creatorSatFee = Math.floor((prevMarket.creatorFee * redeemSats) / 100)
 
     newTx.to(bsv.Address.fromHex(developerPayoutAddress), developerSatFee)
@@ -1124,7 +1129,21 @@ export function getOracleUpdateDetailsTx(
   return getOracleUpdateTx(prevTx, outputIndex, 0, details, rabinPrivKey)
 }
 
-export function isValidOracleInitTx(tx: bsv.Transaction, outputIndex = 0): boolean {
-  const asm = tx.outputs[outputIndex].script.toASM().split(" ")
-  return asm[asm.length - 1] === sha256("00")
+export function isValidOracleInitOutput(tx: bsv.Transaction, outputIndex = 0): boolean {
+  const script = tx.outputs[outputIndex].script
+  const asm = script.toASM().split(" ")
+  return isValidScript(script, oracleContracts[0]) && asm[asm.length - 1] === sha256("00")
+}
+
+export function isValidMarketInitOutput(tx: bsv.Transaction, outputIndex = 0): boolean {
+  const script = tx.outputs[outputIndex].script
+  const market = getMarketFromScript(script)
+  return isValidScript(script, marketContracts[0]) && isValidMarketInit(market)
+}
+
+export function isValidScript(script: bsv.Script, version: version): boolean {
+  const testScript = new bsv.Script(script)
+  testScript.chunks.splice(version.length) // Cut off OP_RETURN
+  testScript.chunks.splice(version.argPos, version.args.length) // Cut out variable arguments
+  return md5(testScript.toHex()) === version.md5
 }
