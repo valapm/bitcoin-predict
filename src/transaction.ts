@@ -1143,6 +1143,9 @@ export function isValidMarketInitOutput(tx: bsv.Transaction, outputIndex = 0): b
 
 export function isValidScript(script: bsv.Script, version: version): boolean {
   const testScript = new bsv.Script(script)
+
+  if (testScript.chunks.length < version.length) return false
+
   testScript.chunks.splice(version.length) // Cut off OP_RETURN
   testScript.chunks.splice(version.argPos, version.args.length) // Cut out variable arguments
   return md5(testScript.toHex()) === version.md5
