@@ -77,16 +77,21 @@ const opReturnDataLength = 3
 //   return `${identifier} ${marketDetailsHex} ${marketStatusHex + marketBalanceHex}`
 // }
 
-export function buildTx(market: marketInfo): bsv.Transaction {
+export function buildTx(market: marketInfo, relayFee = feeb): bsv.Transaction {
   const token = getToken(market)
 
   const contractBalance = getLmsrSatsFixed(market.balance) + market.status.liquidityFeePool
-  const satoshis = contractBalance < DUST ? DUST : contractBalance
 
   const tx = new bsv.Transaction()
-  tx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis }))
+  let output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: contractBalance })
+  const dust = getDust(output.getSize(), relayFee)
 
-  tx.feePerKb(feeb * 1000)
+  if (dust > contractBalance) {
+    output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: dust })
+  }
+
+  tx.addOutput(output)
+  tx.feePerKb(relayFee * 1000)
 
   return tx
 }
@@ -362,7 +367,8 @@ export function getAddEntryTx(
       0,
       0n,
       0,
-      0
+      0,
+      newTx.outputs[0].satoshis
     )
     .toScript()
 
@@ -554,12 +560,21 @@ export function getUpdateEntryTx(
   const newTx = getUpdateMarketTx(prevTx, newMarket)
   newTx.outputs[0].satoshis = newMarketSatBalance + newLiquidityFeePool
 
+  const dust = getDust(newTx.outputs[0].getSize(), feePerByte)
+
+  if (dust > newTx.outputs[0].satoshis) {
+    newTx.outputs[0].satoshis = dust
+  }
+
   // Add fee outputs to dev and creator
   if (redeemSats > 0) {
     const version = getMarketVersion(prevMarket.version)
 
-    const developerSatFee = Math.floor((version.options.devFee * redeemSats) / 100)
-    const creatorSatFee = Math.floor((prevMarket.creatorFee * redeemSats) / 100)
+    let developerSatFee = Math.floor((version.options.devFee * redeemSats) / 100)
+    let creatorSatFee = Math.floor((prevMarket.creatorFee * redeemSats) / 100)
+
+    developerSatFee = developerSatFee > DUST ? developerSatFee : DUST
+    creatorSatFee = creatorSatFee > DUST ? creatorSatFee : DUST
 
     newTx.to(bsv.Address.fromHex(developerPayoutAddress), developerSatFee)
     newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
@@ -601,7 +616,8 @@ export function getUpdateEntryTx(
       0,
       0n,
       0,
-      0
+      0,
+      newTx.outputs[0].satoshis
     )
     .toScript()
 
@@ -711,7 +727,8 @@ export function getOracleCommitTx(
       oracleIndex,
       signature.signature,
       signature.paddingByteCount,
-      0
+      0,
+      newTx.outputs[0].satoshis
     )
     .toScript()
 
@@ -826,7 +843,8 @@ export function getOracleVoteTx(
       oracleIndex,
       signature.signature,
       signature.paddingByteCount,
-      vote
+      vote,
+      newTx.outputs[0].satoshis
     )
     .toScript()
 
@@ -881,11 +899,13 @@ export function fundTx(
 ): bsv.Transaction {
   const inputCount = tx.inputs.length
 
-  for (const output of tx.outputs) {
-    if (output.satoshis < DUST) {
-      output.satoshis = DUST
-    }
-  }
+  // for (const output of tx.outputs) {
+  //   const dust = getDust(output.getSize(), satPerByte)
+
+  //   if (output.satoshis < dust) {
+  //     output.satoshis = dust
+  //   }
+  // }
 
   // const marketOutput = tx.outputs[0]
   // if (marketOutput.satoshis < DUST) {
@@ -1006,7 +1026,8 @@ export function addValaIndex(
 export function getNewOracleTx(
   pubKey: rabinPubKey,
   prevValaIndexTx: bsv.Transaction,
-  prevValaIndexOutputIndex = 0
+  prevValaIndexOutputIndex = 0,
+  relayFee = feeb
 ): bsv.Transaction {
   const token = getOracleToken(pubKey)
   token.setDataPart(sha256("00"))
@@ -1015,9 +1036,14 @@ export function getNewOracleTx(
   // console.log(asm[asm.length - 1])
 
   const tx = new bsv.Transaction()
-  tx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis: DUST }))
+  let output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: 123456789 })
+  const dust = getDust(output.getSize(), relayFee)
 
-  tx.feePerKb(feeb * 1000)
+  output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: dust })
+
+  tx.addOutput(output)
+
+  tx.feePerKb(relayFee * 1000)
 
   addValaIndex(tx, prevValaIndexTx, prevValaIndexOutputIndex)
 
@@ -1036,7 +1062,8 @@ export function getOracleUpdateTx(
     description?: string
     domain: string
   },
-  rabinPrivKey?: rabinPrivKey
+  rabinPrivKey?: rabinPrivKey,
+  relayFee = feeb
 ): bsv.Transaction {
   const pubKeyHex = prevTx.outputs[outputIndex].script.toASM().split(" ")[3]
   const pubKey = hex2BigInt(pubKeyHex)
@@ -1053,7 +1080,7 @@ export function getOracleUpdateTx(
   const newTx = new bsv.Transaction()
   newTx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis }))
 
-  newTx.feePerKb(feeb * 1000)
+  newTx.feePerKb(relayFee * 1000)
 
   // console.log(prevTx.outputs)
   // console.log(outputIndex)
@@ -1149,4 +1176,15 @@ export function isValidScript(script: bsv.Script, version: version): boolean {
   testScript.chunks.splice(version.length) // Cut off OP_RETURN
   testScript.chunks.splice(version.argPos, version.args.length) // Cut out variable arguments
   return md5(testScript.toHex()) === version.md5
+}
+
+export function getDust(scriptPubKeySize: number, relayFee = 0.5) {
+  const largestBnValueOut = 7 // if we are spending all of bitcoin simultaneously, then we need 7 bytes in the TxOut, that's the max.
+  const largestVout = 3 // 63,000 outputs in one tx probably hits the limit on size, so 3 bytes required for a VarInt of 63000
+  const txOutSize = scriptPubKeySize + largestBnValueOut + largestVout
+
+  const buffer = 50 // Buffer for op_return later next tx
+
+  const sats = 3 * Math.floor((148 + txOutSize) * relayFee) // the calculation is dumb, so uses a P2PKH size for assumed input.
+  return sats > 135 ? sats : 135
 }

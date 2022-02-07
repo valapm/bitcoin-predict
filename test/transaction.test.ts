@@ -18,7 +18,8 @@ import {
   DUST,
   getNewMarketTx,
   isValidMarketInitOutput,
-  isValidOracleInitOutput
+  isValidOracleInitOutput,
+  getDust
 } from "../src/transaction"
 import { RabinSignature, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
@@ -1144,7 +1145,7 @@ test("full market graph", () => {
   const entries13 = [entry13, entry10]
 
   expect(isValidMarketUpdateTx(tx13, tx12, entries13)).toBe(true)
-  expect(tx13.outputs[0].satoshis).toBe(546) // Only dust remains
+  expect(tx13.outputs[0].satoshis).toBe(getDust(tx13.outputs[0].getSize())) // Only dust remains
 })
 
 test("get function from script", () => {
@@ -1213,7 +1214,7 @@ test("build and fund oracle burn update transaction", () => {
   // const asm2 = tx2.outputs[0].script.toASM().split(" ")
   // console.log(asm2.slice(asm2.length - 3, asm2.length))
 
-  expect(tx2.outputs[0].satoshis).toBe(1000 + DUST)
+  expect(tx2.outputs[0].satoshis).toBe(1000 + tx.outputs[1].satoshis)
   expect(tx2.getSerializationError()).toBe(undefined)
   expect(tx2.verify()).toBe(true)
   expect(isValidUpdateTx(tx2, tx, 1)).toBe(true)
@@ -1221,7 +1222,7 @@ test("build and fund oracle burn update transaction", () => {
   const tx3 = getOracleBurnTx(tx2, 1000)
   fundTx(tx3, privateKey, address, utxos)
 
-  expect(tx3.outputs[0].satoshis).toBe(2000 + DUST)
+  expect(tx3.outputs[0].satoshis).toBe(1000 + tx2.outputs[0].satoshis)
 
   expect(isValidUpdateTx(tx3, tx2) && tx3.verify() === true && !tx3.getSerializationError()).toBe(true)
 })

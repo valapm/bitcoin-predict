@@ -49,7 +49,7 @@
     "@types/lodash": "^4.14.170",
     "@types/node": "^14.17.2",
     "@types/node-fetch": "^2.5.10",
-    "bsv": "github:valapm/bsv#da8d95a4fbf5429a2f859f443369bae92c8cb9da",
+    "bsv": "github:valapm/bsv#494e64464f1e4068884074c7a14d8331e2b23f5e",
     "md5": "^2.3.0",
     "node-fetch": "^2.6.1",
     "process": "^0.11.10",

@@ -19,8 +19,8 @@ export type marketVersion = version & {
 // Keep track of old versions for compatibility.
 export const marketContracts: marketVersion[] = [
   {
-    identifier: "97281a1a2fd6499a1ddb749c9e701932",
-    version: "0.3.7",
+    identifier: "8f65ba6f86f6ba3c14e47a46e2406152",
+    version: "0.3.9",
     argPos: 14,
     args: [
       "oracleKey",
@@ -36,8 +36,8 @@ export const marketContracts: marketVersion[] = [
       maxOracleCount: 3,
       devFee: 0.2
     },
-    md5: "d4c9441ab8958c6657ee8cd033c5dffa",
-    length: 29299
+    md5: "a80726f8e701d7ccd51a4f7e82be4a1a",
+    length: 29302
   }
 ]
 

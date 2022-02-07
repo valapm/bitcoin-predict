@@ -31,7 +31,8 @@ interface PM extends AbstractContract {
     oraclePos: number,
     oracleSig: BigInt,
     paddingCount: number,
-    oracleDecision: number
+    oracleDecision: number,
+    dustLimit: number
   ): FunctionCall
 }
 
