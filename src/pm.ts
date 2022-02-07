@@ -1,10 +1,10 @@
-import { compile, bsv, buildContractClass, SigHashPreimage, PubKey, Bytes, Sig, Ripemd160 } from "scryptlib"
+import { bsv, buildContractClass, SigHashPreimage, PubKey, Bytes, Sig, Ripemd160 } from "scryptlib"
 import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
 import { int2Hex, toHex, fromHex, hex2IntArray, splitHexByNumber, reverseHex, hex2Int } from "./hex"
 import { isHash, hash, sha256 } from "./sha"
 import { oracleDetail, getOracleDetailsHex, isValidOracleDetails, getOracleStatesHex } from "./oracle"
 import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
-import { ContractDescription, AbstractContract } from "scryptlib/dist/contract"
+import { AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
 import { marketContracts, marketVersion } from "./contracts"
 
