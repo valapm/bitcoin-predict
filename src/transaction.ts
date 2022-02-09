@@ -1164,8 +1164,11 @@ export function isValidOracleInitOutput(tx: bsv.Transaction, outputIndex = 0): b
 
 export function isValidMarketInitOutput(tx: bsv.Transaction, outputIndex = 0): boolean {
   const script = tx.outputs[outputIndex].script
+
+  if (!isValidScript(script, marketContracts[0])) return false
+
   const market = getMarketFromScript(script)
-  return isValidScript(script, marketContracts[0]) && isValidMarketInit(market)
+  return isValidMarketInit(market)
 }
 
 export function isValidScript(script: bsv.Script, version: version): boolean {
