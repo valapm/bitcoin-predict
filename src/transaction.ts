@@ -99,9 +99,10 @@ export function buildTx(market: marketInfo, relayFee = feeb): bsv.Transaction {
 export function getNewMarketTx(
   market: marketInfo,
   prevValaIndexTx: bsv.Transaction,
-  prevValaIndexOutputIndex = 0
+  prevValaIndexOutputIndex = 0,
+  feePerByte = feeb
 ): bsv.Transaction {
-  const tx = buildTx(market)
+  const tx = buildTx(market, feePerByte)
   addValaIndex(tx, prevValaIndexTx, prevValaIndexOutputIndex)
   return tx
 }
@@ -110,9 +111,10 @@ export function getUpdateMarketTx(
   prevTx: bsv.Transaction,
   market: marketInfo,
   outputIndex = 0,
+  feePerByte = feeb,
   unlockingScript: bsv.Script = bsv.Script.empty()
 ): bsv.Transaction {
-  const tx = buildTx(market)
+  const tx = buildTx(market, feePerByte)
 
   const input = bsv.Transaction.Input.fromObject({
     prevTxId: prevTx.hash,
@@ -331,7 +333,7 @@ export function getAddEntryTx(
     balanceMerkleRoot: getMerkleRoot(newEntries)
   }
 
-  const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex)
+  const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex, feePerByte)
 
   fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
 
@@ -557,7 +559,7 @@ export function getUpdateEntryTx(
     }
   }
 
-  const newTx = getUpdateMarketTx(prevTx, newMarket)
+  const newTx = getUpdateMarketTx(prevTx, newMarket, 0, feePerByte)
   newTx.outputs[0].satoshis = newMarketSatBalance + newLiquidityFeePool
 
   const dust = getDust(newTx.outputs[0].getSize(), feePerByte)
@@ -695,7 +697,7 @@ export function getOracleCommitTx(
     oracles: newOracles
   }
 
-  const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex)
+  const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex, feePerByte)
 
   const sigContent = commitmentHash + reverseHex(prevTx.hash)
   const signature = getOracleSig(sigContent, rabinPrivKey)
@@ -812,7 +814,7 @@ export function getOracleVoteTx(
     status: newMarketStatus
   }
 
-  const newTx = getUpdateMarketTx(prevTx, newMarket)
+  const newTx = getUpdateMarketTx(prevTx, newMarket, 0, feePerByte)
 
   const sigContent = int2Hex(vote, 1) + reverseHex(prevTx.hash)
   const signature = getOracleSig(sigContent, rabinPrivKey)
