@@ -119,7 +119,7 @@ export const developerPayoutAddress = "00ae2c80a6e4bd7a01a0c8e6679f888234efac02b
 
 export function getMarketVersion(identifier: string): marketVersion {
   const version = marketContracts.find(version => version.identifier === identifier)
-  if (!version) throw new Error("Market version not supported")
+  if (!version) throw new Error(`Market version ${identifier} not supported`)
   return version
 }
 
