@@ -1,3 +1,6 @@
+import md5 from "md5"
+import { bsv } from "scryptlib"
+
 export type version = {
   identifier: string
   version: string
@@ -20,7 +23,7 @@ export type marketVersion = version & {
 export const marketContracts: marketVersion[] = [
   {
     identifier: "8f65ba6f86f6ba3c14e47a46e2406152",
-    version: "0.3.9",
+    version: "0.3.10",
     argPos: 14,
     args: [
       "oracleKey",
@@ -36,7 +39,7 @@ export const marketContracts: marketVersion[] = [
       maxOracleCount: 3,
       devFee: 0.2
     },
-    md5: "a80726f8e701d7ccd51a4f7e82be4a1a",
+    md5: "50c7bed9076efb5519f723c0d29b4483",
     length: 29302
   }
 ]
@@ -44,11 +47,11 @@ export const marketContracts: marketVersion[] = [
 export const oracleContracts: version[] = [
   {
     identifier: "02fbca51c5c8820b884bcc3d4481a252",
-    version: "0.1.0",
+    version: "0.1.1",
     argPos: 3,
     args: ["rabinPubKey"],
     options: {},
-    md5: "e86c5cc2961ed2d8eec2d1c7d931a4a1",
+    md5: "ced81480741af8e2b2ca1547f6138fbe",
     length: 1236
   }
 ]
@@ -57,4 +60,12 @@ export function getArgPos(version: version, argument: string): number {
   const index = version.args.findIndex(arg => arg === argument)
   if (index === -1) throw new Error("Argument not found")
   return version.argPos + index
+}
+
+export function getMd5(script: bsv.Script, length: number, argPos: number, argLength: number): string {
+  const testScript = new bsv.Script(script)
+
+  testScript.chunks.splice(length) // Cut off OP_RETURN
+  testScript.chunks.splice(argPos, argLength) // Cut out variable arguments
+  return md5(testScript.toHex())
 }
