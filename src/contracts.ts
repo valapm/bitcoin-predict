@@ -41,6 +41,27 @@ export const marketContracts: marketVersion[] = [
     },
     md5: "29b3535c851df8d1326e57f87b21364a",
     length: 31524
+  },
+  {
+    identifier: "8f65ba6f86f6ba3c14e47a46e2406152",
+    version: "0.3.10",
+    argPos: 14,
+    args: [
+      "oracleKey",
+      "globalOptionCount",
+      "requiredVotes",
+      "creatorPubKey",
+      "creatorPayoutAddress",
+      "creatorFee",
+      "liquidityFeeRate"
+    ],
+    options: {
+      maxOptionCount: 6,
+      maxOracleCount: 3,
+      devFee: 0.2
+    },
+    md5: "50c7bed9076efb5519f723c0d29b4483",
+    length: 31508
   }
 ]
 
