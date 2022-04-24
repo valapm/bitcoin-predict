@@ -496,7 +496,13 @@ export function getUpdateEntryTx(
     // User is buying, selling, changing liquidity or market creator is redeeming invalid shares after market is resolved
     newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance)
 
-    redeemSats = prevMarketSatBalance - newMarketSatBalance
+    const noShareChange = newGlobalBalance.shares.every((v, i) => v === prevMarket.balance.shares[i])
+    if (noShareChange) {
+      // Do not calculate any fees if only liquidity is extracted
+      redeemSats = 0
+    } else {
+      redeemSats = prevMarketSatBalance - newMarketSatBalance
+    }
   }
 
   const liquidityFee = redeemSats > 0 ? Math.floor((redeemSats * prevMarket.liquidityFee) / 100) : 0

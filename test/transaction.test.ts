@@ -282,6 +282,8 @@ test("update entry and sell liquidity", () => {
   // console.log(getDebugParams(newTx))
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+  expect(newMarket.status.accLiquidityFeePool).toBe(0) // No fees collected
+  expect(newMarket.status.liquidityPoints).toBe(0)
 })
 
 test("update entry and sell all liqudity", () => {
@@ -318,6 +320,8 @@ test("update entry and sell all liqudity", () => {
   // console.log(getDebugParams(newTx))
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+  expect(newMarket.status.accLiquidityFeePool).toBeGreaterThan(0) // Fees collected, because shares changed as well
+  expect(newMarket.status.liquidityPoints).toBeGreaterThan(0)
 })
 
 test("update to invalid balance", () => {
