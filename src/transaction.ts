@@ -34,7 +34,7 @@ import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinPrivKey, RabinSignature, rabinPubKey } from "rabinsig"
 import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt, hex2Int, toHex } from "./hex"
-import { version, marketContracts, oracleContracts, getArgPos, getMd5 } from "./contracts"
+import { version, currentMarketContract, currentOracleContract, getArgPos, getMd5 } from "./contracts"
 import semverGte from "semver/functions/gte"
 
 const feeb = 0.5
@@ -1167,13 +1167,13 @@ export function getOracleUpdateDetailsTx(
 export function isValidOracleInitOutput(tx: bsv.Transaction, outputIndex = 0): boolean {
   const script = tx.outputs[outputIndex].script
   const asm = script.toASM().split(" ")
-  return isValidScript(script, oracleContracts[0]) && asm[asm.length - 1] === sha256("00")
+  return isValidScript(script, currentOracleContract) && asm[asm.length - 1] === sha256("00")
 }
 
 export function isValidMarketInitOutput(tx: bsv.Transaction, outputIndex = 0): boolean {
   const script = tx.outputs[outputIndex].script
 
-  if (!isValidScript(script, marketContracts[0])) return false
+  if (!isValidScript(script, currentMarketContract)) return false
 
   const market = getMarketFromScript(script)
   return isValidMarketInit(market)

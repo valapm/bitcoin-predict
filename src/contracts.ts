@@ -20,8 +20,8 @@ export type marketVersion = version & {
 }
 
 // Keep track of old versions for compatibility.
-export const marketContracts: marketVersion[] = [
-  {
+export const marketContracts: { [indentifier: string]: marketVersion } = {
+  "60be596a82e2a2a752bafcad8ea9567b": {
     identifier: "60be596a82e2a2a752bafcad8ea9567b",
     version: "0.3.11",
     argPos: 14,
@@ -42,7 +42,7 @@ export const marketContracts: marketVersion[] = [
     md5: "29b3535c851df8d1326e57f87b21364a",
     length: 31524
   },
-  {
+  "8f65ba6f86f6ba3c14e47a46e2406152": {
     identifier: "8f65ba6f86f6ba3c14e47a46e2406152",
     version: "0.3.10",
     argPos: 14,
@@ -63,10 +63,12 @@ export const marketContracts: marketVersion[] = [
     md5: "50c7bed9076efb5519f723c0d29b4483",
     length: 31508
   }
-]
+}
 
-export const oracleContracts: version[] = [
-  {
+export const currentMarketContract = marketContracts["60be596a82e2a2a752bafcad8ea9567b"]
+
+export const oracleContracts: { [indentifier: string]: version } = {
+  "02fbca51c5c8820b884bcc3d4481a252": {
     identifier: "02fbca51c5c8820b884bcc3d4481a252",
     version: "0.1.1",
     argPos: 3,
@@ -75,7 +77,9 @@ export const oracleContracts: version[] = [
     md5: "ced81480741af8e2b2ca1547f6138fbe",
     length: 1475
   }
-]
+}
+
+export const currentOracleContract = oracleContracts["02fbca51c5c8820b884bcc3d4481a252"]
 
 export function getArgPos(version: version, argument: string): number {
   const index = version.args.findIndex(arg => arg === argument)

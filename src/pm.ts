@@ -6,7 +6,7 @@ import { oracleDetail, getOracleDetailsHex, isValidOracleDetails, getOracleState
 import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
 import { AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
-import { marketContracts, marketVersion } from "./contracts"
+import { currentMarketContract, marketContracts, marketVersion } from "./contracts"
 
 const valaIndexContract = "935ec6b78a842b25fb12b353f8a204c7"
 
@@ -118,9 +118,9 @@ export const developerPayoutAddress = "00ae2c80a6e4bd7a01a0c8e6679f888234efac02b
 // }
 
 export function getMarketVersion(identifier: string): marketVersion {
-  const version = marketContracts.find(version => version.identifier === identifier)
-  if (!version) throw new Error(`Market version ${identifier} not supported`)
-  return version
+  const v = marketContracts[identifier]
+  if (v) return v
+  throw new Error(`Market version ${identifier} not supported`)
 }
 
 // export function getToken(oracles: oracleDetail): Token {
@@ -144,7 +144,7 @@ export function getNewMarket(
   const status = { decided: false, decision: 0, votes, liquidityFeePool: 0, accLiquidityFeePool: 0, liquidityPoints: 0 }
 
   return {
-    version: marketContracts[0].identifier,
+    version: currentMarketContract.identifier,
     details,
     status,
     oracles,
