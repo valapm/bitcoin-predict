@@ -19,6 +19,7 @@
     "@tsconfig/node16": "^1.0.2",
     "@types/jest": "^27.4.1",
     "@types/md5": "^2.3.2",
+    "@types/semver": "^7.3.9",
     "@typescript-eslint/eslint-plugin": "^5.18.0",
     "@typescript-eslint/parser": "^5.18.0",
     "assert": "^2.0.0",
@@ -54,6 +55,7 @@
     "node-fetch": "^3.2.3",
     "process": "^0.11.10",
     "rabinsig": "github:sCrypt-Inc/rabin#4a25e31f8289b6cfd4808564e27c0f51730324a9",
-    "scryptlib": "github:valapm/scryptlib#c48e6195b9736c47ee2837d28f26ed50a8296bd7"
+    "scryptlib": "github:valapm/scryptlib#c48e6195b9736c47ee2837d28f26ed50a8296bd7",
+    "semver": "^7.3.7"
   }
 }

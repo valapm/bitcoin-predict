@@ -36,6 +36,7 @@ import { rabinPrivKey, RabinSignature, rabinPubKey } from "rabinsig"
 import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt, hex2Int, toHex } from "./hex"
 import { version, marketContracts, oracleContracts, getArgPos, getMd5 } from "./contracts"
 import md5 from "md5"
+import semver from "semver"
 
 const feeb = 0.5
 
@@ -486,6 +487,8 @@ export function getUpdateEntryTx(
   // const redeemInvalid =
   //   prevMarket.status.decided && publicKey.toString() === prevMarket.creator.pubKey.toString() && !redeemShares
 
+  const version = getMarketVersion(prevMarket.version)
+
   let newMarketSatBalance = 0
 
   if (redeemShares) {
@@ -497,7 +500,7 @@ export function getUpdateEntryTx(
     newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance)
 
     const noShareChange = newGlobalBalance.shares.every((v, i) => v === prevMarket.balance.shares[i])
-    if (noShareChange) {
+    if (noShareChange && semver.gte(version.version, "0.3.11")) {
       // Do not calculate any fees if only liquidity is extracted
       redeemSats = 0
     } else {
@@ -576,8 +579,6 @@ export function getUpdateEntryTx(
 
   // Add fee outputs to dev and creator
   if (redeemSats > 0) {
-    const version = getMarketVersion(prevMarket.version)
-
     let developerSatFee = Math.floor((version.options.devFee * redeemSats) / 100)
     let creatorSatFee = Math.floor((prevMarket.creatorFee * redeemSats) / 100)
 
