@@ -35,8 +35,7 @@ import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinPrivKey, RabinSignature, rabinPubKey } from "rabinsig"
 import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt, hex2Int, toHex } from "./hex"
 import { version, marketContracts, oracleContracts, getArgPos, getMd5 } from "./contracts"
-import md5 from "md5"
-import semver from "semver"
+import semverGte from "semver/functions/gte"
 
 const feeb = 0.5
 
@@ -500,7 +499,7 @@ export function getUpdateEntryTx(
     newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance)
 
     const noShareChange = newGlobalBalance.shares.every((v, i) => v === prevMarket.balance.shares[i])
-    if (noShareChange && semver.gte(version.version, "0.3.11")) {
+    if (noShareChange && semverGte(version.version, "0.3.11")) {
       // Do not calculate any fees if only liquidity is extracted
       redeemSats = 0
     } else {
