@@ -920,11 +920,11 @@ export function fundTx(
   //   marketOutput.satoshis = DUST
   // }
 
+  tx.from(utxos)
+
   tx.feePerKb(satPerByte * 1000)
 
   tx.change(changeAddress)
-
-  tx.from(utxos)
 
   // Remove outputs smaller then dust limit
   // TODO: Should be implemented in contract
