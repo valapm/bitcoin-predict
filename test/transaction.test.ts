@@ -249,6 +249,53 @@ test("update entry", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
+test("Set accurate fee per byte on adding", () => {
+  const tx = getNewMarketTx(market, valaIndexTx)
+  fundTx(tx, privateKey, address, utxos)
+
+  const publicKey = privateKey.publicKey
+  const balance = {
+    liquidity: 0,
+    shares: [1, 0, 2]
+  }
+
+  const newTx = getAddEntryTx(tx, [], publicKey, balance, marketCreator.payoutAddress, utxos, privateKey, 1, 0.1)
+
+  const size = newTx.uncheckedSerialize().length / 2
+  const fee = newTx.inputAmount - newTx.outputAmount
+
+  expect(fee).toBeGreaterThan(size * 0.1)
+  expect(fee).toBeLessThan(size * 0.15)
+})
+
+test("Set accurate fee per byte on update", () => {
+  const tx = buildTx(populatedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 2,
+    shares: [1, 0, 2]
+  }
+
+  const newTx = getUpdateEntryTx(
+    tx,
+    entries,
+    newBalance,
+    false,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey,
+    0.1
+  )
+
+  const size = newTx.uncheckedSerialize().length / 2
+  const fee = newTx.inputAmount - newTx.outputAmount
+
+  expect(fee).toBeGreaterThan(size * 0.1)
+  expect(fee).toBeLessThan(size * 0.15)
+})
+
 test("update entry and sell liquidity", () => {
   const tx = buildTx(populatedMarket)
   fundTx(tx, privateKey, address, utxos)

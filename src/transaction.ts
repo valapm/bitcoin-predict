@@ -335,7 +335,12 @@ export function getAddEntryTx(
 
   const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex, feePerByte)
 
-  fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
+  const txSize = newTx._estimateSize()
+  const sizeEstimate = txSize * 2 + 200 // Tx will get bigger when sighash is added
+  // FIXME: Build template tx using utxos instead
+  const feeMod = sizeEstimate / txSize
+
+  fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte * feeMod)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID
 
@@ -588,7 +593,12 @@ export function getUpdateEntryTx(
     newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
   }
 
-  fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
+  const txSize = newTx._estimateSize()
+  const sizeEstimate = txSize * 2 + 200 // Tx will get bigger when sighash is added
+  // FIXME: Build template tx using utxos instead
+  const feeMod = sizeEstimate / txSize
+
+  fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte * feeMod)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID
 
