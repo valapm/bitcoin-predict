@@ -84,10 +84,9 @@ export function buildTx(market: marketInfo, relayFee = feeb): bsv.Transaction {
 
   const tx = new bsv.Transaction()
   let output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: contractBalance })
-  const dust = getDust(output.getSize(), relayFee)
 
-  if (dust > contractBalance) {
-    output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: dust })
+  if (1 > contractBalance) {
+    output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: 1 })
   }
 
   tx.addOutput(output)
@@ -575,10 +574,8 @@ export function getUpdateEntryTx(
   const newTx = getUpdateMarketTx(prevTx, newMarket, 0, feePerByte)
   newTx.outputs[0].satoshis = newMarketSatBalance + newLiquidityFeePool
 
-  const dust = getDust(newTx.outputs[0].getSize(), feePerByte)
-
-  if (dust > newTx.outputs[0].satoshis) {
-    newTx.outputs[0].satoshis = dust
+  if (1 > newTx.outputs[0].satoshis) {
+    newTx.outputs[0].satoshis = 1
   }
 
   // Add fee outputs to dev and creator
@@ -917,14 +914,6 @@ export function fundTx(
 ): bsv.Transaction {
   const inputCount = tx.inputs.length
 
-  // for (const output of tx.outputs) {
-  //   const dust = getDust(output.getSize(), satPerByte)
-
-  //   if (output.satoshis < dust) {
-  //     output.satoshis = dust
-  //   }
-  // }
-
   // const marketOutput = tx.outputs[0]
   // if (marketOutput.satoshis < DUST) {
   //   marketOutput.satoshis = DUST
@@ -1055,9 +1044,8 @@ export function getNewOracleTx(
 
   const tx = new bsv.Transaction()
   let output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: 123456789 })
-  const dust = getDust(output.getSize(), relayFee)
 
-  output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: dust })
+  output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: 1 })
 
   tx.addOutput(output)
 
@@ -1194,12 +1182,5 @@ export function isValidScript(script: bsv.Script, version: version): boolean {
 }
 
 export function getDust(scriptPubKeySize: number, relayFee = 0.5) {
-  const largestBnValueOut = 7 // if we are spending all of bitcoin simultaneously, then we need 7 bytes in the TxOut, that's the max.
-  const largestVout = 3 // 63,000 outputs in one tx probably hits the limit on size, so 3 bytes required for a VarInt of 63000
-  const txOutSize = scriptPubKeySize + largestBnValueOut + largestVout
-
-  const buffer = 50 // Buffer for op_return later next tx
-
-  const sats = 3 * Math.floor((148 + txOutSize) * relayFee) // the calculation is dumb, so uses a P2PKH size for assumed input.
-  return sats > 135 ? sats : 135
+  return 1
 }
