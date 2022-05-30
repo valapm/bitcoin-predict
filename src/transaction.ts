@@ -532,7 +532,7 @@ export function getUpdateEntryTx(
   const newMerklePath = getMerklePath(newEntries, entryIndex)
 
   const redeemedLiquidityPoolSats = redeemLiquidityPoints
-    ? (newEntryLiquidityPoints / prevMarket.status.liquidityPoints) * prevMarket.status.liquidityFeePool
+    ? Math.floor((newEntryLiquidityPoints / prevMarket.status.liquidityPoints) * prevMarket.status.liquidityFeePool)
     : 0
   const newLiquidityFeePool = prevMarket.status.liquidityFeePool + liquidityFee - redeemedLiquidityPoolSats
 
