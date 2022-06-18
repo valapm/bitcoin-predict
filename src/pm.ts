@@ -163,6 +163,8 @@ export function getNewMarket(
 export function getToken(market: marketInfo): PM {
   const Token = buildContractClass(require(`../scripts/${market.version}.json`)) // eslint-disable-line
 
+  // console.log(market.version)
+
   const token = new Token( // eslint-disable-line
     new Bytes(getOracleDetailsHex(market.oracles)), // oracleKeys
     market.details.options.length, // globalOptionCount

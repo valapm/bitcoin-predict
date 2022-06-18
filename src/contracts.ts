@@ -21,6 +21,27 @@ export type marketVersion = version & {
 
 // Keep track of old versions for compatibility.
 export const marketContracts: { [indentifier: string]: marketVersion } = {
+  "b7be4afbfb07f03ee23b01289804c1c9": {
+    identifier: "b7be4afbfb07f03ee23b01289804c1c9",
+    version: "0.3.12",
+    argPos: 14,
+    args: [
+      "oracleKey",
+      "globalOptionCount",
+      "requiredVotes",
+      "creatorPubKey",
+      "creatorPayoutAddress",
+      "creatorFee",
+      "liquidityFeeRate"
+    ],
+    options: {
+      maxOptionCount: 6,
+      maxOracleCount: 3,
+      devFee: 0.2
+    },
+    md5: "e18c4f75119389e937146b8725a40038",
+    length: 31404
+  },
   "60be596a82e2a2a752bafcad8ea9567b": {
     identifier: "60be596a82e2a2a752bafcad8ea9567b",
     version: "0.3.11",
@@ -65,7 +86,8 @@ export const marketContracts: { [indentifier: string]: marketVersion } = {
   }
 }
 
-export const currentMarketContract = marketContracts["60be596a82e2a2a752bafcad8ea9567b"]
+export const currentMarketContract =
+  marketContracts["b7be4afbfb07f03ee23b01289804c1c9"]
 
 export const oracleContracts: { [indentifier: string]: version } = {
   "02fbca51c5c8820b884bcc3d4481a252": {
@@ -79,7 +101,8 @@ export const oracleContracts: { [indentifier: string]: version } = {
   }
 }
 
-export const currentOracleContract = oracleContracts["02fbca51c5c8820b884bcc3d4481a252"]
+export const currentOracleContract =
+  oracleContracts["02fbca51c5c8820b884bcc3d4481a252"]
 
 export function getArgPos(version: version, argument: string): number {
   const index = version.args.findIndex(arg => arg === argument)
@@ -87,7 +110,12 @@ export function getArgPos(version: version, argument: string): number {
   return version.argPos + index
 }
 
-export function getMd5(script: bsv.Script, length: number, argPos: number, argLength: number): string {
+export function getMd5(
+  script: bsv.Script,
+  length: number,
+  argPos: number,
+  argLength: number
+): string {
   const asm1 = script.toASM().split(" ")
   asm1.splice(argPos, argLength) // Cut out variable arguments
 

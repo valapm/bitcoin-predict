@@ -36,6 +36,7 @@ import { balance } from "../src/lmsr"
 import bsv from "bsv"
 import { getSignature, oracleDetail } from "../src/oracle"
 import { cloneDeep } from "lodash"
+import { addLeaf } from "../src/merkleTree"
 
 const rabin = new RabinSignature()
 
@@ -217,6 +218,148 @@ test("add entry with liquidity", () => {
   ]
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries, 1)).toBe(true)
+})
+
+test("add many entries", () => {
+  // Create market
+
+  const tx = getNewMarketTx(populatedMarket, valaIndexTx)
+  fundTx(tx, privateKey, address, utxos)
+  expect(isValidMarketTx(tx, entries, 1)).toBe(true)
+
+  // Add entry
+
+  const privateKey2 = bsv.PrivateKey.fromString("L4wrW1PZktcohFrbuACjJVPnEZWnfm9tRbh6qoiVfy1dDPfkVVpC")
+  const publicKey2 = privateKey2.publicKey
+
+  const entry2: entry = {
+    publicKey: publicKey2,
+    balance: {
+      liquidity: 0,
+      shares: [0, 0, 2]
+    },
+    globalLiqidityFeePoolSave: 0,
+    liquidityPoints: 0
+  }
+
+  const tx2 = getAddEntryTx(
+    tx,
+    entries,
+    entry2.publicKey,
+    entry2.balance,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey,
+    1
+  )
+
+  const entries2 = entries.concat([entry2])
+
+  expect(isValidMarketUpdateTx(tx2, tx, entries2, 1)).toBe(true)
+  const market2 = getMarketFromScript(tx2.outputs[0].script)
+
+  // const asm = tx2.outputs[0].script.toASM().split(" ")
+  //   console.log(asm.splice(asm.length -4, asm.length))
+
+  const privateKey3 = bsv.PrivateKey.fromString("L15k8C9bTzgG2xXDbxGyQbVL7asiPkeMAdrEwYCw7CHCNaEK1RGi")
+  const publicKey3 = privateKey3.publicKey
+
+  const entry3: entry = {
+    publicKey: publicKey3,
+    balance: {
+      liquidity: 0,
+      shares: [0, 1, 0]
+    },
+    globalLiqidityFeePoolSave: market2.status.accLiquidityFeePool,
+    liquidityPoints: 0
+  }
+
+  const tx3 = getAddEntryTx(
+    tx2,
+    entries2,
+    entry3.publicKey,
+    entry3.balance,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey,
+    0
+  )
+
+  const entries3 = entries2.concat([entry3])
+
+  expect(isValidMarketUpdateTx(tx3, tx2, entries3, 0)).toBe(true)
+
+  const market3 = getMarketFromScript(tx3.outputs[0].script)
+
+  // const asm = tx2.outputs[0].script.toASM().split(" ")
+  //   console.log(asm.splice(asm.length -4, asm.length))
+
+  const privateKey4 = bsv.PrivateKey.fromString("KxKqXsGr7MqXfreojbr1gnJMm7TwkSbmvbN1YR3A8AXnWPigBgWT")
+  const publicKey4 = privateKey4.publicKey
+
+  const entry4: entry = {
+    publicKey: publicKey4,
+    balance: {
+      liquidity: 0,
+      shares: [0, 1, 0]
+    },
+    globalLiqidityFeePoolSave: market3.status.accLiquidityFeePool,
+    liquidityPoints: 0
+  }
+
+  const tx4 = getAddEntryTx(
+    tx3,
+    entries3,
+    entry4.publicKey,
+    entry4.balance,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey,
+    0
+  )
+
+  const entries4 = entries3.concat([entry4])
+
+  expect(isValidMarketUpdateTx(tx4, tx3, entries4, 0)).toBe(true)
+
+  const market4 = getMarketFromScript(tx4.outputs[0].script)
+
+  // const asm = tx2.outputs[0].script.toASM().split(" ")
+  //   console.log(asm.splice(asm.length -4, asm.length))
+
+  const privateKey5 = bsv.PrivateKey.fromString("L3xc2QB9qqsYpwQQqfitSNTXbwRnJSBgrSd2dveJFMWWJZTJwobT")
+  const publicKey5 = privateKey5.publicKey
+
+  const entry5: entry = {
+    publicKey: publicKey5,
+    balance: {
+      liquidity: 0,
+      shares: [1, 0, 0]
+    },
+    globalLiqidityFeePoolSave: market4.status.accLiquidityFeePool,
+    liquidityPoints: 0
+  }
+
+  const tx5 = getAddEntryTx(
+    tx4,
+    entries4,
+    entry5.publicKey,
+    entry5.balance,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey,
+    0
+  )
+
+  const entries5 = entries4.concat([entry5])
+
+  // const asm5 = tx5.outputs[0].script.toASM().split(" ")
+  // console.log(asm5.slice(asm5.length-4, asm5.length))
+  // console.log(tx5.outputs)
+  
+
+  expect(isValidMarketUpdateTx(tx5, tx4, entries5, 0)).toBe(true)
+
 })
 
 test("update entry", () => {

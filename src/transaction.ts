@@ -29,13 +29,14 @@ import {
   getOracleToken
 } from "./oracle"
 import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
-import { getMerkleRootByPath } from "./merkleTree"
+import { getMerkleRootByPath, addLeaf } from "./merkleTree"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinPrivKey, RabinSignature, rabinPubKey } from "rabinsig"
 import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt, hex2Int, toHex } from "./hex"
 import { version, currentMarketContract, currentOracleContract, getArgPos, getMd5 } from "./contracts"
 import semverGte from "semver/functions/gte"
+import { entries } from "lodash"
 
 const feeb = 0.5
 
@@ -245,6 +246,8 @@ export function isValidUpdateTx(
   // console.log(tx.inputs)
   // console.log(DEFAULT_FLAGS)
 
+  // console.log(tx.serialize())
+
   const isValidScript = interpreter.verify(
     unlockingScript,
     lockingScript,
@@ -332,6 +335,8 @@ export function getAddEntryTx(
     balanceMerkleRoot: getMerkleRoot(newEntries)
   }
 
+  // console.log(addLeaf(sha256(lastEntry), lastMerklePath, prevMarket.balanceMerkleRoot, sha256(getEntryHex(entry))), getMerkleRoot(newEntries))
+
   const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex, feePerByte)
 
   const txSize = newTx._estimateSize()
@@ -400,7 +405,8 @@ export function getAddEntryTx(
   //   0,
   //   0n,
   //   0,
-  //   0
+  //   0,
+  //   newTx.outputs[0].satoshis
   // ])
 
   newTx.inputs[0].setScript(unlockingScript)

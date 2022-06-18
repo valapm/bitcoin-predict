@@ -71,8 +71,8 @@ export function addLeaf(lastLeaf: string, lastMerklePath: string, oldMerkleRoot:
         if (sibling !== lastLeafValue) throw new Error("Invalid merkle path for last leaf")
         merkleValue = sha256(lastLeafValue + merkleValue)
       } else {
-        if (sibling !== merkleValue) throw new Error("Invalid merkle path for last leaf")
-        merkleValue = sha256(merkleValue + sibling)
+        // if (sibling !== merkleValue) throw new Error("Invalid merkle path for last leaf")
+        merkleValue = sha256(merkleValue.repeat(2))
       }
 
       joined = true
