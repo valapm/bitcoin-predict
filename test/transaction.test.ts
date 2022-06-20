@@ -201,6 +201,8 @@ test("add entry in old market version", () => {
 
   const tx = getMarketCreationTx({ ...market, version: "b7be4afbfb07f03ee23b01289804c1c9" }, valaIndexTx)
 
+  expect(isValidMarketInitOutput(tx, 1)).toBe(true)
+
   // Replace market version identifier
   // @ts-ignore
   // const opReturnIndex = tx.outputs[1].script.chunks.findIndex(chunk => chunk.opcodenum === bsv.Opcode.OP_RETURN)

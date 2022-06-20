@@ -1400,9 +1400,17 @@ export function isValidOracleInitOutput(tx: bsv.Transaction, outputIndex = 0): b
 export function isValidMarketInitOutput(tx: bsv.Transaction, outputIndex = 0): boolean {
   const script = tx.outputs[outputIndex].script
 
-  if (!isValidScript(script, currentMarketContract)) return false
+  let market
+  let version
+  try {
+    market = getMarketFromScript(script)
+    version = getMarketVersion(market.version)
+  } catch (e) {
+    return false
+  }
 
-  const market = getMarketFromScript(script)
+  if (!isValidScript(script, version)) return false
+
   return isValidMarketInit(market)
 }
 
