@@ -93,8 +93,6 @@ export const marketStatusHexLength = 4
 export const entryLiqudityPos = 33
 export const entrySharePos = 34
 
-export const developerPayoutAddress = "00ae2c80a6e4bd7a01a0c8e6679f888234efac02b6"
-
 // export function getCompiledPM(): void {
 //   const contractPath = require.resolve("scrypt_boilerplate/contracts/predictionMarket.scrypt")
 //   compile({ path: contractPath }, { desc: true })
@@ -160,31 +158,7 @@ export function getNewMarket(
   }
 }
 
-export function getToken(market: marketInfo): PM {
-  const Token = buildContractClass(require(`../scripts/${market.version}.json`)) // eslint-disable-line
-
-  // console.log(market.version)
-
-  const token = new Token( // eslint-disable-line
-    new Bytes(getOracleDetailsHex(market.oracles)), // oracleKeys
-    market.details.options.length, // globalOptionCount
-    market.requiredVotes, // requiredVotes,
-    new PubKey(market.creator.pubKey.toHex()),
-    new Ripemd160(market.creator.payoutAddress.hashBuffer.toString("hex")),
-    market.creatorFee * 100,
-    market.liquidityFee * 100
-  ) as PM
-
-  // console.log([
-  //   new Bytes(getOracleDetailsHex(market.oracles)).toLiteral(), // oracleKeys
-  //   market.details.options.length, // globalOptionCount
-  //   market.requiredVotes, // requiredVotes,
-  //   new PubKey(market.creator.pubKey.toHex()).toLiteral(),
-  //   new Ripemd160(market.creator.payoutAddress.hashBuffer.toString("hex")).toLiteral(),
-  //   market.creatorFee * 100,
-  //   market.liquidityFee * 100
-  // ])
-
+export function getOpReturnData(market: marketInfo): string {
   const marketDetailsHex = getMarketDetailsHex(market.details)
   const oracleStatesHex = getOracleStatesHex(market.oracles)
   const marketStatusHex = getMarketStatusHex(market.status)
@@ -216,7 +190,25 @@ export function getToken(market: marketInfo): PM {
     marketBalanceHex +
     marketBalanceMerkleRoot
 
-  token.setDataPart(`${market.version} ${marketDetailsHex} ${marketDataHex}`)
+  return `${market.version} ${marketDetailsHex} ${marketDataHex}`
+}
+
+export function getToken(market: marketInfo): PM {
+  const Token = buildContractClass(require(`../scripts/${market.version}.json`)) // eslint-disable-line
+
+  // console.log(market.version)
+
+  const token = new Token( // eslint-disable-line
+    new Bytes(getOracleDetailsHex(market.oracles)), // oracleKeys
+    market.details.options.length, // globalOptionCount
+    market.requiredVotes, // requiredVotes,
+    new PubKey(market.creator.pubKey.toHex()),
+    new Ripemd160(market.creator.payoutAddress.hashBuffer.toString("hex")),
+    market.creatorFee * 100,
+    market.liquidityFee * 100
+  ) as PM
+
+  token.setDataPart(getOpReturnData(market))
 
   // console.log(`${market.version} ${marketDetailsHex} ${marketDataHex}`)
 

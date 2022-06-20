@@ -1,4 +1,14 @@
-import { bsv, SigHashPreimage, Bytes, Sig, Ripemd160, buildContractClass } from "scryptlib"
+import {
+  bsv,
+  SigHashPreimage,
+  Bytes,
+  Sig,
+  Ripemd160,
+  buildContractClass,
+  serialize,
+  int2Asm,
+  bool2Asm
+} from "scryptlib"
 import {
   getMarketVersion,
   getMarketStatusfromHex,
@@ -16,9 +26,9 @@ import {
   voteCountByteLen,
   balanceTableByteLength,
   getSharesHex,
-  developerPayoutAddress,
   getIndexToken,
-  isValidMarketInit
+  isValidMarketInit,
+  getOpReturnData
 } from "./pm"
 import {
   getOracleDetailsFromHex,
@@ -78,31 +88,93 @@ const opReturnDataLength = 3
 //   return `${identifier} ${marketDetailsHex} ${marketStatusHex + marketBalanceHex}`
 // }
 
-export function buildTx(market: marketInfo, relayFee = feeb): bsv.Transaction {
+export function getAsmFromJS(inputs: any[]): string {
+  return inputs
+    .map(input => {
+      if (["number", "bigint"].includes(typeof input)) {
+        if (input == -1) return "OP_1NEGATE"
+
+        if (input >= 0 && input <= 16) {
+          return "OP_" + input.toString()
+        }
+
+        // @ts-ignore FIXME:
+        return new bsv.crypto.BN(input.toString()).toSM({ endian: "little" }).toString("hex")
+      }
+
+      if (input === "") return "OP_0"
+      if (input === true) return "OP_TRUE"
+      if (input === false) return "OP_FALSE"
+
+      // const buf = Buffer.from(input, "utf8")
+      // return buf.toString("hex")
+
+      // return serialize(input)
+
+      // Input is bytes
+      return input
+    })
+    .join(" ")
+}
+
+function removeOpReturn(script: bsv.Script): bsv.Script {
+  const opReturnIndex = script.chunks.findIndex(chunk => chunk.opcodenum === 106)
+  const newChunks = script.chunks.slice(0, opReturnIndex + 1)
+  return new bsv.Script({ chunks: newChunks })
+}
+
+function getDataScriptChunks(asm: string) {
+  const asmChunks = asm.split(" ")
+
+  return asmChunks.map(chunk => {
+    var buf = Buffer.from(chunk, "hex")
+    if (buf.toString("hex") !== chunk) {
+      throw new Error("invalid hex string in script")
+    }
+    var len = buf.length
+    let opcodenum
+    if (len >= 0 && len < 76) {
+      opcodenum = len
+    } else if (len < Math.pow(2, 8)) {
+      opcodenum = 76
+    } else if (len < Math.pow(2, 16)) {
+      opcodenum = 77
+    } else if (len < Math.pow(2, 32)) {
+      opcodenum = 78
+    }
+
+    return {
+      buf: buf,
+      len: buf.length,
+      opcodenum: opcodenum
+    }
+  })
+}
+
+export function buildNewMarketTx(market: marketInfo, feePerByte = feeb) {
   const token = getToken(market)
 
   const contractBalance = getLmsrSatsFixed(market.balance) + market.status.liquidityFeePool
 
-  const tx = new bsv.Transaction()
-  let output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: contractBalance })
+  const satoshis = contractBalance >= 1 ? contractBalance : 1
 
-  if (1 > contractBalance) {
-    output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: 1 })
-  }
+  const tx = new bsv.Transaction()
+  let output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis })
 
   tx.addOutput(output)
-  tx.feePerKb(relayFee * 1000)
+  tx.feePerKb(feePerByte * 1000)
 
   return tx
 }
 
-export function getNewMarketTx(
+export function getMarketCreationTx(
   market: marketInfo,
   prevValaIndexTx: bsv.Transaction,
   prevValaIndexOutputIndex = 0,
   feePerByte = feeb
 ): bsv.Transaction {
-  const tx = buildTx(market, feePerByte)
+  const tx = buildNewMarketTx(market, feePerByte)
+
   addValaIndex(tx, prevValaIndexTx, prevValaIndexOutputIndex)
   return tx
 }
@@ -114,7 +186,21 @@ export function getUpdateMarketTx(
   feePerByte = feeb,
   unlockingScript: bsv.Script = bsv.Script.empty()
 ): bsv.Transaction {
-  const tx = buildTx(market, feePerByte)
+  const script = removeOpReturn(prevTx.outputs[outputIndex].script)
+  const opReturnData = getOpReturnData(market)
+  const chunks = getDataScriptChunks(opReturnData)
+
+  script.chunks = script.chunks.concat(chunks)
+
+  const contractBalance = getLmsrSatsFixed(market.balance) + market.status.liquidityFeePool
+
+  const satoshis = contractBalance >= 1 ? contractBalance : 1
+
+  const tx = new bsv.Transaction()
+  let output = new bsv.Transaction.Output({ script, satoshis })
+
+  tx.addOutput(output)
+  tx.feePerKb(feePerByte * 1000)
 
   const input = bsv.Transaction.Input.fromObject({
     prevTxId: prevTx.hash,
@@ -353,36 +439,61 @@ export function getAddEntryTx(
   const changeOutput = newTx.getChangeOutput()
   const changeSats = changeOutput ? changeOutput.satoshis : 0
 
-  const token = getToken(prevMarket)
+  // const token = getToken(prevMarket)
 
-  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[outputIndex].satoshis }
+  // token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[outputIndex].satoshis }
 
-  const unlockingScript = token
-    .updateMarket(
-      new SigHashPreimage(preimage.toString("hex")),
-      1, // action = Add entry
-      new Ripemd160(payoutAddress.hashBuffer.toString("hex")),
-      changeSats,
-      new Bytes(entry.publicKey.toString()),
-      entry.balance.liquidity,
-      new Bytes(getSharesHex(entry.balance.shares)),
-      new Bytes(lastEntry),
-      new Bytes(lastMerklePath),
-      0,
-      new Bytes(""),
-      0,
-      0,
-      false,
-      new Sig("00"),
-      new Bytes(""),
-      0,
-      0n,
-      0,
-      0,
-      newTx.outputs[0].satoshis
-    )
-    .toScript()
+  // const unlockingScriptOld = token
+  //   .updateMarket(
+  //     new SigHashPreimage(preimage.toString("hex")),
+  //     1, // action = Add entry
+  //     new Ripemd160(payoutAddress.hashBuffer.toString("hex")),
+  //     changeSats,
+  //     new Bytes(entry.publicKey.toString()),
+  //     entry.balance.liquidity,
+  //     new Bytes(getSharesHex(entry.balance.shares)),
+  //     new Bytes(lastEntry),
+  //     new Bytes(lastMerklePath),
+  //     0,
+  //     new Bytes(""),
+  //     0,
+  //     0,
+  //     false,
+  //     new Sig("00"),
+  //     new Bytes(""),
+  //     0,
+  //     0n,
+  //     0,
+  //     0,
+  //     newTx.outputs[0].satoshis
+  //   )
+  //   .toScript()
 
+  const unlockingScriptASM = getAsmFromJS([
+    preimage.toString("hex"),
+    1, // action = Add entry
+    payoutAddress.hashBuffer.toString("hex"),
+    changeSats,
+    entry.publicKey.toString(),
+    entry.balance.liquidity,
+    getSharesHex(entry.balance.shares),
+    lastEntry,
+    lastMerklePath,
+    0,
+    "",
+    0,
+    0,
+    false,
+    "00",
+    "",
+    0,
+    0n,
+    0,
+    0,
+    newTx.outputs[0].satoshis
+  ])
+
+  const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
   // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
 
   // console.log([
@@ -408,6 +519,9 @@ export function getAddEntryTx(
   //   0,
   //   newTx.outputs[0].satoshis
   // ])
+
+  // console.log("new", unlockingScript.toASM().split(" ").slice(1))
+  // console.log("old", unlockingScriptOld.toASM().split(" ").slice(1))
 
   newTx.inputs[0].setScript(unlockingScript)
 
@@ -592,7 +706,7 @@ export function getUpdateEntryTx(
     developerSatFee = developerSatFee > DUST ? developerSatFee : DUST
     creatorSatFee = creatorSatFee > DUST ? creatorSatFee : DUST
 
-    newTx.to(bsv.Address.fromHex(developerPayoutAddress), developerSatFee)
+    newTx.to(bsv.Address.fromHex(version.options.developerPayoutAddress), developerSatFee)
     newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
   }
 
@@ -612,35 +726,86 @@ export function getUpdateEntryTx(
   const changeOutput = newTx.getChangeOutput()
   const changeSats = changeOutput ? changeOutput.satoshis : 0
 
-  const token = getToken(prevMarket)
+  // const token = getToken(prevMarket)
 
-  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
+  // token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
 
-  const unlockingScript = token
-    .updateMarket(
-      new SigHashPreimage(preimage.toString("hex")),
-      2, // action = Update entry
-      new Ripemd160(payoutAddress.hashBuffer.toString("hex")),
-      changeSats,
-      new Bytes(publicKey.toString()),
-      newBalance.liquidity,
-      new Bytes(getSharesHex(newBalance.shares)),
-      new Bytes(""),
-      new Bytes(""),
-      oldEntry.balance.liquidity,
-      new Bytes(getSharesHex(oldEntry.balance.shares)),
-      oldEntry.globalLiqidityFeePoolSave,
-      oldEntry.liquidityPoints,
-      redeemLiquidityPoints,
-      new Sig(signature.toString("hex")),
-      new Bytes(merklePath),
-      0,
-      0n,
-      0,
-      0,
-      newTx.outputs[0].satoshis
-    )
-    .toScript()
+  // const unlockingScriptOld = token
+  //   .updateMarket(
+  //     new SigHashPreimage(preimage.toString("hex")),
+  //     2, // action = Update entry
+  //     new Ripemd160(payoutAddress.hashBuffer.toString("hex")),
+  //     changeSats,
+  //     new Bytes(publicKey.toString()),
+  //     newBalance.liquidity,
+  //     new Bytes(getSharesHex(newBalance.shares)),
+  //     new Bytes(""),
+  //     new Bytes(""),
+  //     oldEntry.balance.liquidity,
+  //     new Bytes(getSharesHex(oldEntry.balance.shares)),
+  //     oldEntry.globalLiqidityFeePoolSave,
+  //     oldEntry.liquidityPoints,
+  //     redeemLiquidityPoints,
+  //     new Sig(signature.toString("hex")),
+  //     new Bytes(merklePath),
+  //     0,
+  //     0n,
+  //     0,
+  //     0,
+  //     newTx.outputs[0].satoshis
+  //   )
+  // .toScript()
+
+  const unlockingScriptASM = getAsmFromJS([
+    preimage.toString("hex"),
+    2, // action = Update entry
+    payoutAddress.hashBuffer.toString("hex"),
+    changeSats,
+    publicKey.toString(),
+    newBalance.liquidity,
+    getSharesHex(newBalance.shares),
+    "",
+    "",
+    oldEntry.balance.liquidity,
+    getSharesHex(oldEntry.balance.shares),
+    oldEntry.globalLiqidityFeePoolSave,
+    oldEntry.liquidityPoints,
+    redeemLiquidityPoints,
+    signature.toString("hex"),
+    merklePath,
+    0,
+    0n,
+    0,
+    0,
+    newTx.outputs[0].satoshis
+  ])
+
+  const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
+
+  // console.log("js", [
+  //   2, // action = Update entry
+  //   payoutAddress.hashBuffer.toString("hex"),
+  //   changeSats,
+  //   publicKey.toString(),
+  //   newBalance.liquidity,
+  //   getSharesHex(newBalance.shares),
+  //   "",
+  //   "",
+  //   oldEntry.balance.liquidity,
+  //   getSharesHex(oldEntry.balance.shares),
+  //   oldEntry.globalLiqidityFeePoolSave,
+  //   oldEntry.liquidityPoints,
+  //   redeemLiquidityPoints,
+  //   signature.toString("hex"),
+  //   merklePath,
+  //   0,
+  //   0n,
+  //   0,
+  //   0,
+  //   newTx.outputs[0].satoshis
+  // ])
+  // console.log("new", unlockingScript.toASM().split(" ").slice(1))
+  // console.log("old", unlockingScriptOld.toASM().split(" ").slice(1))
 
   // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
 
@@ -695,7 +860,7 @@ export function getOracleCommitTx(
   // TODO: Offer option to fund transaction separately?
 
   const prevMarket = getMarketFromScript(prevTx.outputs[outputIndex].script)
-  const token = getToken(prevMarket)
+  // const token = getToken(prevMarket)
 
   const rabin = new RabinSignature()
   const rabinPubKey = rabin.privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
@@ -725,33 +890,62 @@ export function getOracleCommitTx(
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
   const preimage = getPreimage(prevTx, newTx, sighashType, outputIndex)
 
-  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[outputIndex].satoshis }
+  // token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[outputIndex].satoshis }
 
-  const unlockingScript = token
-    .updateMarket(
-      new SigHashPreimage(preimage.toString("hex")),
-      3, // action = Update entry
-      new Ripemd160("00"),
-      0,
-      new Bytes(""),
-      0,
-      new Bytes(""),
-      new Bytes(""),
-      new Bytes(""),
-      0,
-      new Bytes(""),
-      0,
-      0,
-      false,
-      new Sig("00"),
-      new Bytes(""),
-      oracleIndex,
-      signature.signature,
-      signature.paddingByteCount,
-      0,
-      newTx.outputs[0].satoshis
-    )
-    .toScript()
+  // const unlockingScriptOld = token
+  //   .updateMarket(
+  //     new SigHashPreimage(preimage.toString("hex")),
+  //     3, // action = Update entry
+  //     new Ripemd160("00"),
+  //     0,
+  //     new Bytes(""),
+  //     0,
+  //     new Bytes(""),
+  //     new Bytes(""),
+  //     new Bytes(""),
+  //     0,
+  //     new Bytes(""),
+  //     0,
+  //     0,
+  //     false,
+  //     new Sig("00"),
+  //     new Bytes(""),
+  //     oracleIndex,
+  //     signature.signature,
+  //     signature.paddingByteCount,
+  //     0,
+  //     newTx.outputs[0].satoshis
+  //   )
+  //   .toScript()
+
+  const unlockingScriptASM = getAsmFromJS([
+    preimage.toString("hex"),
+    3, // action = Update entry
+    "00",
+    0,
+    "",
+    0,
+    "",
+    "",
+    "",
+    0,
+    "",
+    0,
+    0,
+    false,
+    "00",
+    "",
+    oracleIndex,
+    signature.signature,
+    signature.paddingByteCount,
+    0,
+    newTx.outputs[0].satoshis
+  ])
+
+  const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
+
+  // console.log("new", unlockingScript.toASM().split(" ").slice(1))
+  // console.log("old", unlockingScriptOld.toASM().split(" ").slice(1))
 
   // console.log([
   //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
@@ -796,7 +990,7 @@ export function getOracleVoteTx(
   // TODO: Offer option to fund transaction separately?
 
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
-  const token = getToken(prevMarket)
+  // const token = getToken(prevMarket)
 
   const rabin = new RabinSignature()
   const rabinPubKey = rabin.privKeyToPubKey(rabinPrivKey.p, rabinPrivKey.q)
@@ -841,33 +1035,62 @@ export function getOracleVoteTx(
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
   const preimage = getPreimage(prevTx, newTx, sighashType)
 
-  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
+  // token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[0].satoshis }
 
-  const unlockingScript = token
-    .updateMarket(
-      new SigHashPreimage(preimage.toString("hex")),
-      4, // action = Update entry
-      new Ripemd160("00"),
-      0,
-      new Bytes(""),
-      0,
-      new Bytes(""),
-      new Bytes(""),
-      new Bytes(""),
-      0,
-      new Bytes(""),
-      0,
-      0,
-      false,
-      new Sig("00"),
-      new Bytes(""),
-      oracleIndex,
-      signature.signature,
-      signature.paddingByteCount,
-      vote,
-      newTx.outputs[0].satoshis
-    )
-    .toScript()
+  // const unlockingScriptOld = token
+  //   .updateMarket(
+  //     new SigHashPreimage(preimage.toString("hex")),
+  //     4, // action = Update entry
+  //     new Ripemd160("00"),
+  //     0,
+  //     new Bytes(""),
+  //     0,
+  //     new Bytes(""),
+  //     new Bytes(""),
+  //     new Bytes(""),
+  //     0,
+  //     new Bytes(""),
+  //     0,
+  //     0,
+  //     false,
+  //     new Sig("00"),
+  //     new Bytes(""),
+  //     oracleIndex,
+  //     signature.signature,
+  //     signature.paddingByteCount,
+  //     vote,
+  //     newTx.outputs[0].satoshis
+  //   )
+  //   .toScript()
+
+  const unlockingScriptASM = getAsmFromJS([
+    preimage.toString("hex"),
+    4, // action = Update entry
+    "00",
+    0,
+    "",
+    0,
+    "",
+    "",
+    "",
+    0,
+    "",
+    0,
+    0,
+    false,
+    "00",
+    "",
+    oracleIndex,
+    signature.signature,
+    signature.paddingByteCount,
+    vote,
+    newTx.outputs[0].satoshis
+  ])
+
+  const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
+
+  // console.log("new", unlockingScript.toASM().split(" ").slice(1))
+  // console.log("old", unlockingScriptOld.toASM().split(" ").slice(1))
 
   // console.log([
   //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),

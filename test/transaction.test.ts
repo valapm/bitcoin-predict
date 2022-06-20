@@ -1,5 +1,5 @@
 import {
-  buildTx,
+  buildNewMarketTx,
   fundTx,
   isValidMarketTx,
   getUpdateEntryTx,
@@ -16,7 +16,7 @@ import {
   getOracleBurnTx,
   isValidUpdateTx,
   DUST,
-  getNewMarketTx,
+  getMarketCreationTx,
   isValidMarketInitOutput,
   isValidOracleInitOutput,
   getDust
@@ -134,9 +134,9 @@ beforeEach(() => {
 })
 
 test("Convert from and to market hex", () => {
-  const tx = getNewMarketTx(market, valaIndexTx)
+  const tx = getMarketCreationTx(market, valaIndexTx)
   const parsedMarket = getMarketFromScript(tx.outputs[1].script)
-  const tx2 = getNewMarketTx(parsedMarket, valaIndexTx)
+  const tx2 = getMarketCreationTx(parsedMarket, valaIndexTx)
 
   const asm1 = tx.outputs[1].script.toASM()
   const asm2 = tx2.outputs[1].script.toASM()
@@ -149,14 +149,14 @@ test("Convert from and to market hex", () => {
 })
 
 test("build and fund pm init transaction", () => {
-  const tx = getNewMarketTx(market, valaIndexTx)
+  const tx = getMarketCreationTx(market, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
   expect(isValidMarketTx(tx, [], 1)).toBe(true)
   expect(isValidMarketInitOutput(tx, 1)).toBe(true)
 })
 
 test("throw at invalid transaction", () => {
-  const tx = getNewMarketTx(market, valaIndexTx)
+  const tx = getMarketCreationTx(market, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
   tx.outputs[1].script.chunks.splice(30, 1)
@@ -165,15 +165,48 @@ test("throw at invalid transaction", () => {
 })
 
 test("convert between market and script consistency", () => {
-  const tx = getNewMarketTx(market, valaIndexTx)
+  const tx = getMarketCreationTx(market, valaIndexTx)
   const extractedMarket = getMarketFromScript(tx.outputs[1].script)
-  const tx2 = getNewMarketTx(extractedMarket, valaIndexTx)
+  const tx2 = getMarketCreationTx(extractedMarket, valaIndexTx)
 
   expect(tx2.outputs[1].script.toASM()).toBe(tx.outputs[1].script.toASM())
 })
 
 test("add entry", () => {
-  const tx = getNewMarketTx(market, valaIndexTx)
+  const tx = getMarketCreationTx(market, valaIndexTx)
+  fundTx(tx, privateKey, address, utxos)
+
+  const publicKey = privateKey.publicKey
+  const balance = {
+    liquidity: 0,
+    shares: [1, 0, 2]
+  }
+
+  const newTx = getAddEntryTx(tx, [], publicKey, balance, marketCreator.payoutAddress, utxos, privateKey, 1)
+
+  const newEntries = [
+    {
+      balance,
+      publicKey,
+      globalLiqidityFeePoolSave: 0,
+      liquidityPoints: 0
+    }
+  ]
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries, 1)).toBe(true)
+})
+
+test("add entry in old market version", () => {
+  // jest.mock('../src/service', () => require('./__mocks__/request'));
+
+  const tx = getMarketCreationTx({ ...market, version: "b7be4afbfb07f03ee23b01289804c1c9" }, valaIndexTx)
+
+  // Replace market version identifier
+  // @ts-ignore
+  // const opReturnIndex = tx.outputs[1].script.chunks.findIndex(chunk => chunk.opcodenum === bsv.Opcode.OP_RETURN)
+  // const helperScript = bsv.Script.fromASM("60be596a82e2a2a752bafcad8ea9567b")
+  // tx.outputs[1].script.chunks[opReturnIndex + 1] = helperScript.chunks[0]
+
   fundTx(tx, privateKey, address, utxos)
 
   const publicKey = privateKey.publicKey
@@ -197,7 +230,7 @@ test("add entry", () => {
 })
 
 test("add entry with liquidity", () => {
-  const tx = getNewMarketTx(market, valaIndexTx)
+  const tx = getMarketCreationTx(market, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
   const publicKey = privateKey.publicKey
@@ -223,7 +256,7 @@ test("add entry with liquidity", () => {
 test("add many entries", () => {
   // Create market
 
-  const tx = getNewMarketTx(populatedMarket, valaIndexTx)
+  const tx = getMarketCreationTx(populatedMarket, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
   expect(isValidMarketTx(tx, entries, 1)).toBe(true)
 
@@ -356,14 +389,12 @@ test("add many entries", () => {
   // const asm5 = tx5.outputs[0].script.toASM().split(" ")
   // console.log(asm5.slice(asm5.length-4, asm5.length))
   // console.log(tx5.outputs)
-  
 
   expect(isValidMarketUpdateTx(tx5, tx4, entries5, 0)).toBe(true)
-
 })
 
 test("update entry", () => {
-  const tx = buildTx(populatedMarket)
+  const tx = buildNewMarketTx(populatedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -393,7 +424,7 @@ test("update entry", () => {
 })
 
 test("Set accurate fee per byte on adding", () => {
-  const tx = getNewMarketTx(market, valaIndexTx)
+  const tx = getMarketCreationTx(market, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
   const publicKey = privateKey.publicKey
@@ -412,7 +443,7 @@ test("Set accurate fee per byte on adding", () => {
 })
 
 test("Set accurate fee per byte on update", () => {
-  const tx = buildTx(populatedMarket)
+  const tx = buildNewMarketTx(populatedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -440,7 +471,7 @@ test("Set accurate fee per byte on update", () => {
 })
 
 test("update entry and sell liquidity", () => {
-  const tx = buildTx(populatedMarket)
+  const tx = buildNewMarketTx(populatedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -477,7 +508,7 @@ test("update entry and sell liquidity", () => {
 })
 
 test("update entry and sell all liqudity", () => {
-  const tx = buildTx(populatedMarket)
+  const tx = buildNewMarketTx(populatedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -515,7 +546,7 @@ test("update entry and sell all liqudity", () => {
 })
 
 test("update to invalid balance", () => {
-  const tx = buildTx(populatedMarket)
+  const tx = buildNewMarketTx(populatedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -529,7 +560,7 @@ test("update to invalid balance", () => {
 })
 
 test("oracle commitment", () => {
-  const tx = getNewMarketTx(populatedMarket, valaIndexTx)
+  const tx = getMarketCreationTx(populatedMarket, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
   const newTx = getOracleCommitTx(tx, rabinPrivKey1, address, utxos, privateKey, 1)
@@ -543,7 +574,7 @@ test("oracle vote succeeds", () => {
   const committedMarket: marketInfo = cloneDeep(populatedMarket)
   committedMarket.oracles[0].committed = true
 
-  const tx = buildTx(committedMarket)
+  const tx = buildNewMarketTx(committedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const vote = 1
@@ -559,7 +590,7 @@ test("oracle vote succeeds", () => {
 })
 
 test("oracle vote not possible without commitment", () => {
-  const tx = buildTx(populatedMarket)
+  const tx = buildNewMarketTx(populatedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const vote = 1
@@ -572,7 +603,7 @@ test("oracle vote and market resolve", () => {
   committedMarket.oracles[0].committed = true
   committedMarket.requiredVotes = 40
 
-  const tx = buildTx(committedMarket)
+  const tx = buildNewMarketTx(committedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const vote = 1
@@ -592,7 +623,7 @@ test("Two oracles vote and market resolve", () => {
   committedMarket.oracles[0].committed = true
   committedMarket.oracles[1].committed = true
 
-  const tx = buildTx(committedMarket)
+  const tx = buildNewMarketTx(committedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const vote = 2
@@ -638,7 +669,7 @@ test("redeem winning shares", () => {
   resolvedMarket.balance = entry.balance
   resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
 
-  const tx = buildTx(resolvedMarket)
+  const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -692,7 +723,7 @@ test("redeem invalid shares", () => {
   resolvedMarket.balance = entry.balance
   resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
 
-  const tx = buildTx(resolvedMarket)
+  const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -751,7 +782,7 @@ test("sell liquidity after market is resolved", () => {
   resolvedMarket.balance = entry.balance
   resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
 
-  const tx = buildTx(resolvedMarket)
+  const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -805,7 +836,7 @@ test("Market creator can sell liquidity after market is resolved", () => {
   resolvedMarket.balance = entry.balance
   resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
 
-  const tx = buildTx(resolvedMarket)
+  const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -864,7 +895,7 @@ test("can't sell liquidity and redeem shares after market is resolved", () => {
   resolvedMarket.balance = entry.balance
   resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
 
-  const tx = buildTx(resolvedMarket)
+  const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -918,7 +949,7 @@ test("Redeem winning shares after loosing shares", () => {
   }
   resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
 
-  const tx = buildTx(resolvedMarket)
+  const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -972,7 +1003,7 @@ test("liquidity points generation", () => {
   market1.balanceMerkleRoot = getBalanceMerkleRoot([entry1])
   market1.balance = entry1.balance
 
-  const tx1 = buildTx(market1)
+  const tx1 = buildNewMarketTx(market1)
   fundTx(tx1, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -1034,7 +1065,7 @@ test("liquidity points redeeming", () => {
   market1.status.liquidityFeePool = 1000
   market1.status.liquidityPoints = 10000
 
-  const tx1 = buildTx(market1)
+  const tx1 = buildNewMarketTx(market1)
   fundTx(tx1, privateKey, address, utxos)
 
   const newBalance: balance = {
@@ -1070,7 +1101,7 @@ test("liquidity points redeeming", () => {
 test("full market graph", () => {
   // Create market
 
-  const tx = getNewMarketTx(populatedMarket, valaIndexTx)
+  const tx = getMarketCreationTx(populatedMarket, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
   expect(isValidMarketTx(tx, entries, 1)).toBe(true)
 
@@ -1343,7 +1374,7 @@ test("full market graph", () => {
 })
 
 test("get function from script", () => {
-  const tx = buildTx(populatedMarket)
+  const tx = buildNewMarketTx(populatedMarket)
   fundTx(tx, privateKey, address, utxos)
 
   const newEntry: entry = {

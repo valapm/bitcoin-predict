@@ -16,12 +16,35 @@ export type marketVersion = version & {
     devFee: number
     maxOptionCount: number
     maxOracleCount: number
+    developerPayoutAddress: string
   }
 }
 
 // Keep track of old versions for compatibility.
 export const marketContracts: { [indentifier: string]: marketVersion } = {
-  "b7be4afbfb07f03ee23b01289804c1c9": {
+  "73145fea9a249918adf07357674cf33d": {
+    identifier: "73145fea9a249918adf07357674cf33d",
+    version: "0.3.13",
+    argPos: 14,
+    args: [
+      "oracleKey",
+      "globalOptionCount",
+      "requiredVotes",
+      "creatorPubKey",
+      "creatorPayoutAddress",
+      "creatorFee",
+      "liquidityFeeRate"
+    ],
+    options: {
+      maxOptionCount: 6,
+      maxOracleCount: 3,
+      devFee: 0.2,
+      developerPayoutAddress: "0053faba2fb9a28dfa94d93270079cd2aa270180f3"
+    },
+    md5: "80085a7c1ac58d67eb19e8b82064ef3c",
+    length: 31404
+  },
+  b7be4afbfb07f03ee23b01289804c1c9: {
     identifier: "b7be4afbfb07f03ee23b01289804c1c9",
     version: "0.3.12",
     argPos: 14,
@@ -37,7 +60,8 @@ export const marketContracts: { [indentifier: string]: marketVersion } = {
     options: {
       maxOptionCount: 6,
       maxOracleCount: 3,
-      devFee: 0.2
+      devFee: 0.2,
+      developerPayoutAddress: "00ae2c80a6e4bd7a01a0c8e6679f888234efac02b6"
     },
     md5: "e18c4f75119389e937146b8725a40038",
     length: 31404
@@ -58,7 +82,8 @@ export const marketContracts: { [indentifier: string]: marketVersion } = {
     options: {
       maxOptionCount: 6,
       maxOracleCount: 3,
-      devFee: 0.2
+      devFee: 0.2,
+      developerPayoutAddress: "00ae2c80a6e4bd7a01a0c8e6679f888234efac02b6"
     },
     md5: "29b3535c851df8d1326e57f87b21364a",
     length: 31524
@@ -79,15 +104,15 @@ export const marketContracts: { [indentifier: string]: marketVersion } = {
     options: {
       maxOptionCount: 6,
       maxOracleCount: 3,
-      devFee: 0.2
+      devFee: 0.2,
+      developerPayoutAddress: "00ae2c80a6e4bd7a01a0c8e6679f888234efac02b6"
     },
     md5: "50c7bed9076efb5519f723c0d29b4483",
     length: 31508
   }
 }
 
-export const currentMarketContract =
-  marketContracts["b7be4afbfb07f03ee23b01289804c1c9"]
+export const currentMarketContract = marketContracts["73145fea9a249918adf07357674cf33d"]
 
 export const oracleContracts: { [indentifier: string]: version } = {
   "02fbca51c5c8820b884bcc3d4481a252": {
@@ -101,8 +126,7 @@ export const oracleContracts: { [indentifier: string]: version } = {
   }
 }
 
-export const currentOracleContract =
-  oracleContracts["02fbca51c5c8820b884bcc3d4481a252"]
+export const currentOracleContract = oracleContracts["02fbca51c5c8820b884bcc3d4481a252"]
 
 export function getArgPos(version: version, argument: string): number {
   const index = version.args.findIndex(arg => arg === argument)
@@ -110,12 +134,7 @@ export function getArgPos(version: version, argument: string): number {
   return version.argPos + index
 }
 
-export function getMd5(
-  script: bsv.Script,
-  length: number,
-  argPos: number,
-  argLength: number
-): string {
+export function getMd5(script: bsv.Script, length: number, argPos: number, argLength: number): string {
   const asm1 = script.toASM().split(" ")
   asm1.splice(argPos, argLength) // Cut out variable arguments
 
