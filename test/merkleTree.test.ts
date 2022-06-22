@@ -1,9 +1,4 @@
-import {
-  addLeaf,
-  verifyLeaf,
-  getMerkleRoot,
-  getMerklePath
-} from "../src/merkleTree"
+import { addLeaf, verifyLeaf, getMerkleRoot, getMerklePath, getMerkleRootByPath } from "../src/merkleTree"
 import { sha256 } from "../src/sha"
 
 test("Add leafs", () => {
@@ -21,13 +16,7 @@ test("Add leafs", () => {
 
   expect(verifyLeaf(sha256("05"), lastPath2, root2)).toBe(true)
 
-  const rootTest = getMerkleRoot([
-    sha256("01"),
-    sha256("02"),
-    sha256("03"),
-    sha256("04"),
-    sha256("05")
-  ])
+  const rootTest = getMerkleRoot([sha256("01"), sha256("02"), sha256("03"), sha256("04"), sha256("05")])
 
   expect(rootTest).toBe(root2)
 
@@ -38,14 +27,7 @@ test("Add leafs", () => {
 
   expect(verifyLeaf(sha256("06"), lastPath3, root3)).toBe(true)
 
-  const rootTest2 = getMerkleRoot([
-    sha256("01"),
-    sha256("02"),
-    sha256("03"),
-    sha256("04"),
-    sha256("05"),
-    sha256("06")
-  ])
+  const rootTest2 = getMerkleRoot([sha256("01"), sha256("02"), sha256("03"), sha256("04"), sha256("05"), sha256("06")])
 
   expect(rootTest2).toBe(root3)
 

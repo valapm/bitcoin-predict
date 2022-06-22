@@ -40,7 +40,7 @@ import {
   getOracleToken
 } from "./oracle"
 import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
-import { getMerkleRootByPath, addLeaf } from "./merkleTree"
+import { getMerkleRootByPath, addLeaf, verifyLeaf } from "./merkleTree"
 import { sha256 } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinPrivKey, RabinSignature, rabinPubKey } from "rabinsig"
@@ -472,6 +472,11 @@ export function getAddEntryTx(
   //   )
   //   .toScript()
 
+  // if (!verifyLeaf(sha256(lastEntry), lastMerklePath, prevMarket.balanceMerkleRoot)) {
+  //   console.log(sha256(lastEntry), lastMerklePath, prevMarket.balanceMerkleRoot)
+  //   console.log(prevEntries.map(entry => sha256(getEntryHex(entry))))
+  // }
+
   const unlockingScriptASM = getAsmFromJS([
     preimage.toString("hex"),
     1, // action = Add entry
@@ -530,11 +535,11 @@ export function getAddEntryTx(
 
   newTx.inputs[0].setScript(unlockingScript)
 
-  console.log(newTx.toString())
-  console.log(prevTx.outputs[0].satoshis)
+  // console.log(newTx.toString())
+  // console.log(prevTx.outputs[0].satoshis)
 
-  const asm = prevTx.outputs[0].script.toASM().split(" ")
-  console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
+  // const asm = prevTx.outputs[0].script.toASM().split(" ")
+  // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
 
   return newTx
 }
