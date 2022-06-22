@@ -28,7 +28,8 @@ import {
   getSharesHex,
   getIndexToken,
   isValidMarketInit,
-  getOpReturnData
+  getOpReturnData,
+  getScryptTokenParams
 } from "./pm"
 import {
   getOracleDetailsFromHex,
@@ -154,7 +155,8 @@ function getDataScriptChunks(asm: string) {
 export function buildNewMarketTx(market: marketInfo, feePerByte = feeb) {
   const token = getToken(market)
 
-  const contractBalance = getLmsrSatsFixed(market.balance) + market.status.liquidityFeePool
+  const version = getMarketVersion(market.version)
+  const contractBalance = getLmsrSatsFixed(market.balance, version) + market.status.liquidityFeePool
 
   const satoshis = contractBalance >= 1 ? contractBalance : 1
 
@@ -192,7 +194,8 @@ export function getUpdateMarketTx(
 
   script.chunks = script.chunks.concat(chunks)
 
-  const contractBalance = getLmsrSatsFixed(market.balance) + market.status.liquidityFeePool
+  const version = getMarketVersion(market.version)
+  const contractBalance = getLmsrSatsFixed(market.balance, version) + market.status.liquidityFeePool
 
   const satoshis = contractBalance >= 1 ? contractBalance : 1
 
@@ -494,6 +497,8 @@ export function getAddEntryTx(
   ])
 
   const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
+
+  // console.log(getScryptTokenParams(prevMarket))
   // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
 
   // console.log([
@@ -525,11 +530,11 @@ export function getAddEntryTx(
 
   newTx.inputs[0].setScript(unlockingScript)
 
-  // console.log(newTx.toString())
-  // console.log(prevTx.outputs[0].satoshis)
+  console.log(newTx.toString())
+  console.log(prevTx.outputs[0].satoshis)
 
-  // const asm = prevTx.outputs[0].script.toASM().split(" ")
-  // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
+  const asm = prevTx.outputs[0].script.toASM().split(" ")
+  console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
 
   return newTx
 }
@@ -620,7 +625,8 @@ export function getUpdateEntryTx(
     newMarketSatBalance = prevMarketSatBalance - redeemSats
   } else {
     // User is buying, selling, changing liquidity or market creator is redeeming invalid shares after market is resolved
-    newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance)
+
+    newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance, version)
 
     const noShareChange = newGlobalBalance.shares.every((v, i) => v === prevMarket.balance.shares[i])
     if (noShareChange && semverGte(version.version, "0.3.11")) {

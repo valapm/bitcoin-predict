@@ -3,90 +3,14 @@
  * They are necessary to ensure that we produce the same results as the oracles.
  */
 
-export const precision = 16
+export const precision = 64
 export const scale = 2 ** precision
-const scale2 = 2 ** 20
+export const bigIntScale = BigInt(scale)
 
-const ln2 = Math.round((Math.log(10) * scale2) / Math.log2(10))
-const ln10 = Math.round((Math.log10(10) * scale2) / Math.log2(10))
-
-export const e = Math.round(Math.E * scale)
-
-/**
- * Works for numbers:
- * With 10 loops: Between 1000 and 0.001
- * With 20 loops: Between 1000000 and 0.000001
- * ~ 4 decimal points precision
- */
-export function log2(x: number): number {
-  if (x > 65536000000 || x < 65536) {
-    throw new Error() // loops arent sufficient;
-  }
-
-  let b = 32768
-  let y = 0
-
-  // // If less than 1; lmsr doesn't need values below 1
-  // for (let i = 0; i < 20; i++) {
-  //   if (x < scale) {
-  //     x = x * 2
-  //     y = y - scale
-  //   }
-  // }
-
-  // If more than 1
-  for (let i = 0; i < 20; i++) {
-    if (x >= 2 * scale) {
-      x = Math.floor(x / 2)
-      y = y + scale
-    }
-  }
-
-  let z = x
-
-  // loop precision times
-  for (let i = 0; i < 16; i++) {
-    z = Math.floor((z * z) / scale)
-    if (z >= 2 * scale) {
-      z = Math.floor(z / 2)
-      y = y + b
-    }
-
-    b = Math.floor(b / 2)
-  }
-
-  return y
-}
-
-export function log(x: number): number {
-  return Math.floor((log2(x) * ln2) / scale2)
-}
-
-export function log10(x: number): number {
-  return Math.floor((log2(x) * ln10) / scale2)
-}
-
-/**
- * Adapted from https://github.com/PetteriAimonen/libfixmath/blob/master/libfixmath/fix16_exp.c
- */
-export function expOld(x: number): number {
-  if (x >= 681391 || x < 0) throw new Error()
-
-  if (x == 0) return scale
-  if (x == 65536) return e
-
-  let result = x + scale
-  let term = x
-
-  for (let i = 2; i < 30; i++) {
-    term = Math.floor(Math.floor(term * x) / Math.floor(i * scale))
-    result += term
-
-    if (term < 500 && (i > 15 || term < 20)) break
-  }
-
-  return result
-}
+const ln2 = BigInt(Math.round((Math.log(10) * scale) / Math.log2(10)))
+const ln10 = BigInt(Math.round((Math.log10(10) * scale) / Math.log2(10)))
+const log2e = BigInt(Math.round(Math.log2(Math.E) * 2 ** 64))
+export const e = BigInt(Math.round(Math.E * scale))
 
 /**
  * Calculates the binary exponent of x using the binary fraction method.
@@ -310,14 +234,108 @@ export function exp2(x: bigint): bigint {
   return result // Scaled to 64 bits fixed-point number
 }
 
-const log2e = 26613026195688645000n // Math.floor(Math.log2(Math.E) * 2**64)
-
 /**
  * Accepts and returns scaled by 2**64 (64-bit fixed-point number).
  */
-export function expNew(x: bigint): bigint {
+export function exp(x: bigint): bigint {
   if (x > 2454971259878909673472n) throw new Error("exp above max value") // Max value is 133.084258667509499441
   if (x < -764553562531197616128n) throw new Error("exp below min value") // Min value is -41.446531673892822322
 
   return exp2((x * log2e) >> 64n)
+}
+
+/**
+ * Finds the zero-based index of the first one in the binary representation of x.
+ * Accepts numbers scaled by 2**64 (64-bit fixed-point number).
+ * Adapted from https://github.com/paulrberg/prb-math
+ */
+export function mostSignificantBit(x: bigint): number {
+  let msb = 0
+
+  if (x >= 2n ** 128n) {
+    x = x >> 128n
+    msb += 128
+  }
+  if (x >= 2n ** 64n) {
+    x = x >> 64n
+    msb += 64
+  }
+  if (x >= 2n ** 32n) {
+    x = x >> 32n
+    msb += 32
+  }
+  if (x >= 2n ** 16n) {
+    x = x >> 16n
+    msb += 16
+  }
+  if (x >= 2n ** 8n) {
+    x = x >> 8n
+    msb += 8
+  }
+  if (x >= 2n ** 4n) {
+    x = x >> 4n
+    msb += 4
+  }
+  if (x >= 2n ** 2n) {
+    x = x >> 2n
+    msb += 2
+  }
+  if (x >= 2n ** 1n) {
+    // No need to shift x any more.
+    msb += 1
+  }
+
+  return msb
+}
+
+/**
+ * Calculates the binary logarithm of x.
+ * Accepts and returns scaled by 2**64 (64-bit fixed-point number).
+ * Only works for x greater then 1 << 64 (log2(1)).
+ * Adapted from https://github.com/paulrberg/prb-math
+ */
+export function log2(x: bigint): bigint {
+  if (x < bigIntScale) {
+    throw new Error()
+  }
+
+  // Calculate the integer part of the logarithm and add it to the result and finally calculate y = x * 2^(-n).
+  let n = mostSignificantBit(x / bigIntScale)
+
+  // The integer part of the logarithm as a signed 59.18-decimal fixed-point number. The operation can't overflow
+  // because n is maximum 255, bigIntScale is 1e18 and sign is either 1 or -1.
+  let result = BigInt(n) * bigIntScale
+
+  // This is y = x * 2^(-n).
+  let y = x >> BigInt(n)
+
+  // If y = 1, the fractional part is zero.
+  if (y == bigIntScale) {
+    return result
+  }
+
+  // Calculate the fractional part via the iterative approximation.
+  // The "delta >>= 1" part is equivalent to "delta /= 2", but shifting bits is faster.
+  for (let i = 1; i <= precision; i++) {
+    y = (y * y) / bigIntScale
+
+    // Is y^2 > 2 and so in the range [2,4)?
+    if (y >= bigIntScale << 1n) {
+      // Add the 2^(-m) factor to the logarithm.
+      let delta = bigIntScale >> BigInt(i)
+      result += delta
+
+      // Corresponds to z/2 on Wikipedia.
+      y = y >> 1n
+    }
+  }
+  return result
+}
+
+export function log(x: bigint): bigint {
+  return (log2(x) * ln2) / bigIntScale
+}
+
+export function log10(x: bigint): bigint {
+  return (log2(x) * ln10) / bigIntScale
 }

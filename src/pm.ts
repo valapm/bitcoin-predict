@@ -193,6 +193,18 @@ export function getOpReturnData(market: marketInfo): string {
   return `${market.version} ${marketDetailsHex} ${marketDataHex}`
 }
 
+export function getScryptTokenParams(market: marketInfo) {
+  return [
+    new Bytes(getOracleDetailsHex(market.oracles)).toLiteral(), // oracleKeys
+    market.details.options.length, // globalOptionCount
+    market.requiredVotes, // requiredVotes,
+    new PubKey(market.creator.pubKey.toHex()).toLiteral(),
+    new Ripemd160(market.creator.payoutAddress.hashBuffer.toString("hex")).toLiteral(),
+    market.creatorFee * 100,
+    market.liquidityFee * 100
+  ]
+}
+
 export function getToken(market: marketInfo): PM {
   const Token = buildContractClass(require(`../scripts/${market.version}.json`)) // eslint-disable-line
 
@@ -424,7 +436,8 @@ export function getMinMarketSatBalance(market: marketInfo, entries: entry[]): nu
     const shares = balance.shares[market.status.decision]
     return shares * SatScaling + market.status.liquidityFeePool
   } else {
-    return getLmsrSatsFixed(balance) + market.status.liquidityFeePool
+    const version = getMarketVersion(market.version)
+    return getLmsrSatsFixed(balance, version) + market.status.liquidityFeePool
   }
 }
 
