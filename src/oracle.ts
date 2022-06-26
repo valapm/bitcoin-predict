@@ -6,11 +6,10 @@ import { FunctionCall } from "scryptlib/dist/abi"
 import { int2Hex, hex2BigInt, hex2Bool, bool2Hex, splitHexByNumber } from "./hex"
 import { num2bin } from "scryptlib"
 import { sha256 } from "./sha"
+import { currentOracleContract} from "./contracts"
 
 export type oracleDetail = { pubKey: rabinPubKey; votes: number; committed?: boolean; voted?: boolean }
 // export type oracleState = {}
-
-export const oracleContractHash = "02fbca51c5c8820b884bcc3d4481a252"
 
 export const rabinKeyByteLength = 126
 export const oracleInfoByteLength = rabinKeyByteLength + 1
@@ -111,11 +110,11 @@ interface oracleContract extends AbstractContract {
 }
 
 export function getOracleToken(pubKey: rabinPubKey): oracleContract {
-  const Token = buildContractClass(require(`../scripts/${oracleContractHash}.json`)) // eslint-disable-line
+  const Token = buildContractClass(require(`../scripts/${currentOracleContract.identifier}.json`)) // eslint-disable-line
 
   const token = new Token(pubKey) as oracleContract // eslint-disable-line
 
-  token.setDataPart(sha256("00"))
+  token.setDataPartInASM(sha256("00"))
 
   return token
 }

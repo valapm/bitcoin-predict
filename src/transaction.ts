@@ -76,7 +76,7 @@ const opReturnDataLength = 3
 //   const marketDetailsHex = getMarketDetailsHex(market.details)
 //   const marketStatusHex = getMarketStatusHex(market.status)
 
-//   token.setDataPart(`${identifier} ${marketDetailsHex} ${marketStatusHex + marketBalanceHex}`)
+//   token.setDataPartInASM(`${identifier} ${marketDetailsHex} ${marketStatusHex + marketBalanceHex}`)
 
 //   return token.lockingScript as bsv.Script
 // }
@@ -656,6 +656,8 @@ export function getUpdateEntryTx(
     liquidityPoints: redeemLiquidityPoints ? 0 : newEntryLiquidityPoints
   }
 
+  // console.log({prevShares: prevMarket.balance.shares, newShares: newGlobalBalance.shares, redeemShares, redeemSats, newAccLiquidityFeePool, newEntryLiquidityPoints})
+
   const newEntries = [...prevEntries]
   newEntries[entryIndex] = newEntry
 
@@ -719,6 +721,9 @@ export function getUpdateEntryTx(
 
     newTx.to(bsv.Address.fromHex(version.options.developerPayoutAddress), developerSatFee)
     newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
+
+    // console.log({developerSatFee, creatorSatFee})
+    // console.log(newTx.outputs[1].script.toHex(), newTx.outputs[2].script.toHex())
   }
 
   const txSize = newTx._estimateSize()
@@ -726,9 +731,16 @@ export function getUpdateEntryTx(
   // FIXME: Build template tx using utxos instead
   const feeMod = sizeEstimate / txSize
 
+  // console.log({
+  //   txSize,
+  //   feeMod,
+  //   feePerByte
+  // })
+
   fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte * feeMod)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_ALL | Signature.SIGHASH_FORKID
+  // console.log({sighashType})
 
   const preimage = getPreimage(prevTx, newTx, sighashType)
 
@@ -736,6 +748,15 @@ export function getUpdateEntryTx(
 
   const changeOutput = newTx.getChangeOutput()
   const changeSats = changeOutput ? changeOutput.satoshis : 0
+
+  // console.log(
+  //   {newLiquidityFeePool,
+  //   newAccLiquidityFeePool,
+  //   newLiquidityPoints,
+  //   newGlobalBalance,
+  //   balanceMerkleRoot: newMarket.balanceMerkleRoot,
+  //   newSatBalance: newTx.outputs[0].satoshis}
+  // )
 
   // const token = getToken(prevMarket)
 
@@ -793,55 +814,43 @@ export function getUpdateEntryTx(
 
   const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
 
-  // console.log("js", [
-  //   2, // action = Update entry
-  //   payoutAddress.hashBuffer.toString("hex"),
-  //   changeSats,
-  //   publicKey.toString(),
-  //   newBalance.liquidity,
-  //   getSharesHex(newBalance.shares),
-  //   "",
-  //   "",
-  //   oldEntry.balance.liquidity,
-  //   getSharesHex(oldEntry.balance.shares),
-  //   oldEntry.globalLiqidityFeePoolSave,
-  //   oldEntry.liquidityPoints,
-  //   redeemLiquidityPoints,
-  //   signature.toString("hex"),
-  //   merklePath,
-  //   0,
-  //   0n,
-  //   0,
-  //   0,
-  //   newTx.outputs[0].satoshis
-  // ])
-  // console.log("new", unlockingScript.toASM().split(" ").slice(1))
-  // console.log("old", unlockingScriptOld.toASM().split(" ").slice(1))
-
+  // console.log(getScryptTokenParams(prevMarket))
   // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
 
   // console.log([
-  //   // new SigHashPreimage(preimage.toString("hex")).toLiteral(),
-  //   2, // action = Update entry
-  //   new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
-  //   changeSats,
-  //   new Bytes(publicKey.toString()).toLiteral(),
-  //   newBalance.liquidity,
-  //   new Bytes(getSharesHex(newBalance.shares)).toLiteral(),
-  //   new Bytes("").toLiteral(),
-  //   new Bytes("").toLiteral(),
-  //   oldEntry.balance.liquidity,
-  //   new Bytes(getSharesHex(oldEntry.balance.shares)).toLiteral(),
-  //   oldEntry.globalLiqidityFeePoolSave,
-  //   oldEntry.liquidityPoints,
-  //   redeemLiquidityPoints,
-  //   new Sig(signature.toString("hex")).toLiteral(),
-  //   new Bytes(merklePath).toLiteral(),
-  //   0,
-  //   0n,
-  //   0,
-  //   0
+  //     // new SigHashPreimage(preimage.toString("hex")),
+  //     2, // action = Update entry
+  //     new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
+  //     changeSats,
+  //     new Bytes(publicKey.toString()).toLiteral(),
+  //     newBalance.liquidity,
+  //     new Bytes(getSharesHex(newBalance.shares)).toLiteral(),
+  //     new Bytes("").toLiteral(),
+  //     new Bytes("").toLiteral(),
+  //     oldEntry.balance.liquidity,
+  //     new Bytes(getSharesHex(oldEntry.balance.shares)).toLiteral(),
+  //     oldEntry.globalLiqidityFeePoolSave,
+  //     oldEntry.liquidityPoints,
+  //     redeemLiquidityPoints,
+  //     new Sig(signature.toString("hex")).toLiteral(),
+  //     new Bytes(merklePath).toLiteral(),
+  //     0,
+  //     0n,
+  //     0,
+  //     0,
+  //     newTx.outputs[0].satoshis
   // ])
+
+  // console.log(newTx.outputs[0].script.toHex())
+  // console.log("changeSats", changeSats,newTx.outputs[3].satoshis)
+  // console.log([
+  //   newTx.outputs[1].script.toHex(), // dev
+  //   version.options.developerPayoutAddress,
+  //   newTx.outputs[2].script.toHex(), // creator
+  //   newTx.outputs[3].script.toHex(),
+  // ])
+  // console.log("new", unlockingScript.toASM().split(" ").slice(1))
+  // console.log("old", unlockingScriptOld.toASM().split(" ").slice(1))
 
   newTx.inputs[0].setScript(unlockingScript)
 
@@ -851,10 +860,6 @@ export function getUpdateEntryTx(
   // const asm = prevTx.outputs[0].script.toASM().split(" ")
   // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
 
-  // const asm = newTx.outputs[0].script.toASM().split(" ")
-  // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
-
-  // console.log(newTx.outputs)
 
   return newTx
 }
@@ -1277,7 +1282,7 @@ export function getNewOracleTx(
   relayFee = feeb
 ): bsv.Transaction {
   const token = getOracleToken(pubKey)
-  token.setDataPart(sha256("00"))
+  token.setDataPartInASM(sha256("00"))
 
   // const asm = token.lockingScript.toASM().split(" ")
   // console.log(asm[asm.length - 1])
@@ -1319,12 +1324,21 @@ export function getOracleUpdateTx(
   const detailsHex = details ? toHex(JSON.stringify(details)) : "00"
   const detailsHash = sha256(detailsHex)
 
-  const token = getOracleToken(pubKey)
+  // const token = getOracleToken(pubKey)
 
-  token.setDataPart(detailsHash)
+  // @ts-ignore
+  const newScript = removeOpReturn(prevTx.outputs[outputIndex].script)
+  const chunks = getDataScriptChunks(detailsHash)
+  newScript.chunks = newScript.chunks.concat(chunks)
+
+
+  // console.log(token.lockingScript.toASM())
+  // token.setDataPartInASM(detailsHash)
+  // console.log(token.lockingScript.toASM())
 
   const newTx = new bsv.Transaction()
-  newTx.addOutput(new bsv.Transaction.Output({ script: token.lockingScript, satoshis }))
+  newTx.addOutput(new bsv.Transaction.Output({ script: newScript, satoshis }))
+
 
   newTx.feePerKb(relayFee * 1000)
 
@@ -1346,30 +1360,54 @@ export function getOracleUpdateTx(
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
   const preimage = getPreimage(prevTx, newTx, sighashType, outputIndex)
 
-  token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[outputIndex].satoshis }
+  // token.txContext = { tx: newTx, inputIndex: 0, inputSatoshis: prevTx.outputs[outputIndex].satoshis }
 
+  let unlockingScriptASM
   if (details) {
     if (!rabinPrivKey) throw new Error("Missing rabin private key")
 
     const sigContent = detailsHash
     const signature = getOracleSig(sigContent, rabinPrivKey)
 
-    const unlockingScript = token
-      .update(
-        new SigHashPreimage(preimage.toString("hex")),
-        details ? 1 : 2,
-        new Bytes(detailsHex),
-        signature.signature,
-        signature.paddingByteCount,
-        burnSats
-      )
-      .toScript()
+    unlockingScriptASM = getAsmFromJS([
+      preimage.toString("hex"),
+      details ? 1 : 2,
+      detailsHex,
+      signature.signature,
+      signature.paddingByteCount,
+      burnSats
+    ])
 
-    newTx.inputs[0].setScript(unlockingScript)
+
+    // const unlockingScript = token
+    //   .update(
+    //     new SigHashPreimage(preimage.toString("hex")),
+    //     details ? 1 : 2,
+    //     new Bytes(detailsHex),
+    //     signature.signature,
+    //     signature.paddingByteCount,
+    //     burnSats
+    //   )
+    //   .toScript()
+
+      // console.log([
+      //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
+      //   details ? 1 : 2,
+      //   new Bytes(detailsHex).toLiteral(),
+      //   signature.signature.toString(),
+      //   signature.paddingByteCount,
+      //   burnSats
+      // ])
+
+
   } else {
-    const unlockingScript = token
-      .update(new SigHashPreimage(preimage.toString("hex")), 2, new Bytes(""), 0n, 0, burnSats)
-      .toScript()
+    // const unlockingScript = token
+    //   .update(new SigHashPreimage(preimage.toString("hex")), 2, new Bytes(""), 0n, 0, burnSats)
+    //   .toScript()
+
+      unlockingScriptASM = getAsmFromJS([
+        preimage.toString("hex"), 2, "", 0n, 0, burnSats
+      ])
 
     // console.log([
     //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
@@ -1380,8 +1418,16 @@ export function getOracleUpdateTx(
     //   burnSats
     // ])
 
-    newTx.inputs[0].setScript(unlockingScript)
   }
+
+  const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
+  newTx.inputs[0].setScript(unlockingScript)
+
+  // console.log(newTx.toString())
+  // console.log(prevTx.outputs[outputIndex].satoshis)
+
+  // const asm = prevTx.outputs[outputIndex].script.toASM().split(" ")
+  // console.log(asm.slice(asm.length - 1, asm.length).join(" "))
 
   return newTx
 }

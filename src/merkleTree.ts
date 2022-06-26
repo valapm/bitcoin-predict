@@ -104,7 +104,7 @@ export function updateLeaf(oldLeaf: string, newLeaf: string, merklePath: string,
     const left = parseInt(merklePath.slice(i * 66 + 64, i * 66 + 66))
     const oldNeighbor = merklePath.slice(i * 66, i * 66 + 64)
     const newNeighbor = oldNeighbor === oldMerkleValue ? newMerkleValue : oldNeighbor
-    console.log(oldMerkleValue)
+    // console.log(oldMerkleValue)
     if (left) {
       oldMerkleValue = sha256(oldMerkleValue + oldNeighbor)
       newMerkleValue = sha256(newMerkleValue + newNeighbor)
@@ -112,7 +112,7 @@ export function updateLeaf(oldLeaf: string, newLeaf: string, merklePath: string,
       oldMerkleValue = sha256(oldNeighbor + oldMerkleValue)
       newMerkleValue = sha256(newNeighbor + newMerkleValue)
     }
-    console.log(oldNeighbor, "=>", oldMerkleValue, Boolean(left))
+    // console.log(oldNeighbor, "=>", oldMerkleValue, Boolean(left))
     i = i + 1
   }
 

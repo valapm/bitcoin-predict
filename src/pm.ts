@@ -8,7 +8,7 @@ import { AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
 import { currentMarketContract, marketContracts, marketVersion } from "./contracts"
 
-const valaIndexContract = "935ec6b78a842b25fb12b353f8a204c7"
+const valaIndexContract = "2af7dfaa7e799e28c7c31fc303dc915c"
 
 interface PM extends AbstractContract {
   updateMarket(
@@ -220,7 +220,7 @@ export function getToken(market: marketInfo): PM {
     market.liquidityFee * 100
   ) as PM
 
-  token.setDataPart(getOpReturnData(market))
+  token.setDataPartInASM(getOpReturnData(market))
 
   // console.log(`${market.version} ${marketDetailsHex} ${marketDataHex}`)
 
@@ -414,6 +414,8 @@ export function validateEntries(market: marketInfo, entries: entry[]): boolean {
   const hasCorrectShares = market.status.decided
     ? true
     : market.balance.shares.every((n, i) => n === calculatedBalance.shares[i])
+
+  // console.log({entries: JSON.stringify(entries.map(e => e.balance))})
   const hasCorrectBalanceMerkleRoot = market.balanceMerkleRoot === getBalanceMerkleRoot(entries)
 
   // console.log({

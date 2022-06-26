@@ -1,4 +1,5 @@
-import { addLeaf, verifyLeaf, getMerkleRoot, getMerklePath, getMerkleRootByPath } from "../src/merkleTree"
+import { update } from "lodash"
+import { addLeaf, verifyLeaf, getMerkleRoot, getMerklePath, getMerkleRootByPath, updateLeaf } from "../src/merkleTree"
 import { sha256 } from "../src/sha"
 
 test("Add leafs", () => {
@@ -49,4 +50,54 @@ test("Add leafs", () => {
   ])
 
   expect(rootTest3).toBe(root4)
+})
+
+test("calculate valid paths", () => {
+  const hashes = [
+    sha256("01"),
+    sha256("02"),
+    sha256("03"),
+    sha256("04"),
+    sha256("05"),
+    sha256("06"),
+    sha256("07")
+  ]
+
+  const root = getMerkleRoot(hashes)
+
+  const path = getMerklePath(3, hashes)
+  expect(verifyLeaf(sha256("04"), path, root)).toBe(true)
+
+  const path2 = getMerklePath(4, hashes)
+  expect(verifyLeaf(sha256("05"), path2, root)).toBe(true)
+
+  const path3 = getMerklePath(5, hashes)
+  expect(verifyLeaf(sha256("06"), path3, root)).toBe(true)
+})
+
+test("update leafs", () => {
+  const hashes = [
+    sha256("01"),
+    sha256("02"),
+    sha256("03"),
+    sha256("04"),
+    sha256("05"),
+    sha256("06"),
+    sha256("07")
+  ]
+
+  const root = getMerkleRoot(hashes)
+
+  const root2 = updateLeaf(sha256("03"), sha256("08"), getMerklePath(2, hashes), root)
+  const hashes2 = [
+    sha256("01"),
+    sha256("02"),
+    sha256("08"),
+    sha256("04"),
+    sha256("05"),
+    sha256("06"),
+    sha256("07")
+  ]
+
+  expect(getMerkleRoot(hashes2)).toBe(root2)
 })

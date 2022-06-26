@@ -52,11 +52,11 @@
     "@types/lodash": "^4.14.181",
     "@types/node": "^17.0.23",
     "@types/node-fetch": "^2.6.1",
-    "bsv": "github:valapm/bsv#ba963c9e59cf3f4b9c6c4589ebd27f636046f1b3",
+    "bsv": "github:valapm/bsv#db79a588125855658422842a829d9d2f8fa015f1",
     "md5": "^2.3.0",
     "node-fetch": "^3.2.3",
     "process": "^0.11.10",
     "rabinsig": "github:sCrypt-Inc/rabin#4a25e31f8289b6cfd4808564e27c0f51730324a9",
-    "scryptlib": "github:valapm/scryptlib#c48e6195b9736c47ee2837d28f26ed50a8296bd7"
+    "scryptlib": "github:valapm/scryptlib#cb9299949a0371aeb2fbcd363d9af8dbc3117e72"
   }
 }
