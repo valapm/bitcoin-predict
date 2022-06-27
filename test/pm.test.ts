@@ -12,6 +12,7 @@ import {
 } from "../src/pm"
 import { bsv } from "scryptlib"
 import { int2Hex } from "../src/hex"
+import { currentMarketContract } from "../src/contracts"
 
 test("Convert entry to and from hex", () => {
   const privateKey = bsv.PrivateKey.fromString("Kys3cyL5HZ4upzwWsnirv4urUeczpnweiJ2zY5EDBCkRZ5j2TTdj")
@@ -25,9 +26,9 @@ test("Convert entry to and from hex", () => {
     liquidityPoints: 10
   }
 
-  const entryHex = getEntryHex(entry)
-  const parsedEntry = getEntryFromHex(entryHex)
-  const entryHex2 = getEntryHex(parsedEntry)
+  const entryHex = getEntryHex(entry, currentMarketContract)
+  const parsedEntry = getEntryFromHex(entryHex, currentMarketContract)
+  const entryHex2 = getEntryHex(parsedEntry, currentMarketContract)
 
   expect(entryHex).toBe(entryHex2)
 })
@@ -38,9 +39,9 @@ test("Convert balance from and to hex", () => {
     shares: [1, 2, 3, 4, 6]
   }
 
-  const balanceHex = getBalanceHex(balance)
-  const parsedBalance = getBalanceFromHex(balanceHex)
-  const balanceHex2 = getBalanceHex(parsedBalance)
+  const balanceHex = getBalanceHex(balance, currentMarketContract)
+  const parsedBalance = getBalanceFromHex(balanceHex, currentMarketContract)
+  const balanceHex2 = getBalanceHex(parsedBalance, currentMarketContract)
 
   expect(balanceHex).toBe(balanceHex2)
 })

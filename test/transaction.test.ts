@@ -30,13 +30,16 @@ import {
   getNewMarket,
   creatorInfo,
   marketDetails,
-  getIndexToken
+  getIndexToken,
+  market2JSON,
+  getMarketVersion
 } from "../src/pm"
 import { balance } from "../src/lmsr"
 import bsv from "bsv"
 import { getSignature, oracleDetail } from "../src/oracle"
 import { cloneDeep } from "lodash"
 import { addLeaf } from "../src/merkleTree"
+import { marketVersion } from "../src/contracts"
 
 const rabin = new RabinSignature()
 
@@ -66,9 +69,7 @@ const utxoData = [
     address: "1KCrKrbmjiyHhx8Wp8zKCqLgAbUV5B8okY",
     txid: "4fdfb21063a59f2c524f5d690b2f3fa728ed4fb5761a3e472839eb4aed367d63",
     vout: 1,
-    amount: 0.1,
-    satoshis: 10000000,
-    value: 8000,
+    amount: 100,
     height: 661843,
     confirmations: 82,
     scriptPubKey: "76a914c7b003a282cae060ade434c349f497189b7a71cd88ac",
@@ -85,7 +86,8 @@ let oracleDetails: oracleDetail[],
   marketCreator: creatorInfo,
   marketDetails: marketDetails,
   market: marketInfo,
-  populatedMarket: marketInfo
+  populatedMarket: marketInfo,
+  version: marketVersion
 
 const valaIndexToken = getIndexToken()
 const valaIndexTx = new bsv.Transaction()
@@ -95,11 +97,15 @@ beforeEach(() => {
   oracleDetails = [
     {
       pubKey: rabinPubKey1,
-      votes: 40
+      votes: 40,
+      voted: false,
+      committed: false
     },
     {
       pubKey: rabinPubKey2,
-      votes: 60
+      votes: 60,
+      voted: false,
+      committed: false
     }
   ]
 
@@ -116,6 +122,8 @@ beforeEach(() => {
 
   market = getNewMarket(marketDetails, oracleDetails, marketCreator, creatorFee, liquidityFee, requiredVotes)
 
+  version = getMarketVersion(market.version)
+
   entry = {
     publicKey: privateKey.publicKey,
     balance: {
@@ -130,22 +138,54 @@ beforeEach(() => {
 
   populatedMarket = getNewMarket(marketDetails, oracleDetails, marketCreator, creatorFee, liquidityFee, requiredVotes)
   populatedMarket.balance = entry.balance
-  populatedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
+  populatedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
 })
 
 test("Convert from and to market hex", () => {
+  const complexMarket = cloneDeep(populatedMarket)
+  complexMarket.balance = {
+    liquidity: 1000,
+    shares: [1, 0, 1000]
+  }
+  complexMarket.status = {
+    accLiquidityFeePool: 12345678,
+    liquidityFeePool: 123456,
+    decided: false,
+    liquidityPoints: 123456789,
+    decision: 1,
+    votes: [0, 1, 0]
+  }
+
+  const tx = getMarketCreationTx(complexMarket, valaIndexTx)
+  const parsedMarket = getMarketFromScript(tx.outputs[1].script)
+
+  expect(market2JSON(complexMarket)).toStrictEqual(market2JSON(parsedMarket))
+
+  const tx2 = getMarketCreationTx(parsedMarket, valaIndexTx)
+
+  const asm1 = tx.outputs[1].script.toASM().split(" ")
+  const asm2 = tx2.outputs[1].script.toASM().split(" ")
+
+  const opReturn1 = asm1.slice(asm1.length - 3, asm1.length)
+  const opReturn2 = asm2.slice(asm2.length - 3, asm2.length)
+
+  expect(opReturn1.join(" ")).toBe(opReturn2.join(" "))
+  expect(asm1.join(" ")).toBe(asm2.join(" "))
+})
+
+test("Parse market from tx", () => {
   const tx = getMarketCreationTx(market, valaIndexTx)
   const parsedMarket = getMarketFromScript(tx.outputs[1].script)
   const tx2 = getMarketCreationTx(parsedMarket, valaIndexTx)
 
-  const asm1 = tx.outputs[1].script.toASM()
-  const asm2 = tx2.outputs[1].script.toASM()
+  const asm1 = tx.outputs[1].script.toASM().split(" ")
+  const asm2 = tx2.outputs[1].script.toASM().split(" ")
 
-  const opReturn1 = asm1.split(" ").slice(asm1.length - 3, asm1.length)
-  const opReturn2 = asm2.split(" ").slice(asm2.length - 3, asm2.length)
+  const opReturn1 = asm1.slice(asm1.length - 3, asm1.length)
+  const opReturn2 = asm2.slice(asm2.length - 3, asm2.length)
 
-  expect(opReturn1.join(" ") === opReturn2.join(" "))
-  expect(asm1).toBe(asm2)
+  expect(opReturn1.join(" ")).toBe(opReturn2.join(" "))
+  expect(asm1.join(" ")).toBe(asm2.join(" "))
 })
 
 test("build and fund pm init transaction", () => {
@@ -192,6 +232,8 @@ test("add entry", () => {
       liquidityPoints: 0
     }
   ]
+
+  // console.log(market2JSON(getMarketFromScript(newTx.outputs[0].script)))
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries, 1)).toBe(true)
 })
@@ -420,8 +462,6 @@ test("update entry (buy)", () => {
 
   const newEntries = [newEntry]
 
-  // console.log(getDebugParams(newTx))
-
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
@@ -449,6 +489,36 @@ test("update entry (sell)", () => {
   newEntry.balance = newBalance
   newEntry.liquidityPoints = 1642
   newEntry.globalLiqidityFeePoolSave = 821
+
+  const newEntries = [newEntry]
+
+  // console.log(getDebugParams(newTx))
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+test("add a lots of liquidty", () => {
+  const tx = buildNewMarketTx(populatedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 2000,
+    shares: [1, 0, 2]
+  }
+
+  const newTx = getUpdateEntryTx(
+    tx,
+    entries,
+    newBalance,
+    false,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey
+  )
+
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
 
   const newEntries = [newEntry]
 
@@ -618,9 +688,7 @@ test("update entry and sell all liqudity and buy shares", () => {
 })
 test("update entry and sell all liqudity but some liquidity remains", () => {
   const entry2 = {
-    publicKey: bsv.PrivateKey.fromString(
-      "L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm"
-    ).publicKey,
+    publicKey: bsv.PrivateKey.fromString("L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm").publicKey,
     balance: {
       liquidity: 1,
       shares: [0, 0, 0]
@@ -633,7 +701,7 @@ test("update entry and sell all liqudity but some liquidity remains", () => {
 
   const market = getNewMarket(marketDetails, oracleDetails, marketCreator, creatorFee, liquidityFee, requiredVotes)
   market.balance = getMarketBalance(entries, 3)
-  market.balanceMerkleRoot = getBalanceMerkleRoot(entries)
+  market.balanceMerkleRoot = getBalanceMerkleRoot(entries, version)
 
   const tx = buildNewMarketTx(market)
   fundTx(tx, privateKey, address, utxos)
@@ -672,9 +740,7 @@ test("update entry and sell all liqudity but some liquidity remains", () => {
 
 test("update entry (buy) with other entry existing", () => {
   const entry2 = {
-    publicKey: bsv.PrivateKey.fromString(
-      "L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm"
-    ).publicKey,
+    publicKey: bsv.PrivateKey.fromString("L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm").publicKey,
     balance: {
       liquidity: 1,
       shares: [0, 0, 0]
@@ -687,7 +753,7 @@ test("update entry (buy) with other entry existing", () => {
 
   const market = getNewMarket(marketDetails, oracleDetails, marketCreator, creatorFee, liquidityFee, requiredVotes)
   market.balance = getMarketBalance(entries, 3)
-  market.balanceMerkleRoot = getBalanceMerkleRoot(entries)
+  market.balanceMerkleRoot = getBalanceMerkleRoot(entries, version)
 
   const tx = buildNewMarketTx(market)
   fundTx(tx, privateKey, address, utxos)
@@ -728,9 +794,7 @@ test("update entry (buy) with other entry existing", () => {
 
 test("update entry (sell) with other entry existing", () => {
   const entry2 = {
-    publicKey: bsv.PrivateKey.fromString(
-      "L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm"
-    ).publicKey,
+    publicKey: bsv.PrivateKey.fromString("L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm").publicKey,
     balance: {
       liquidity: 1,
       shares: [0, 0, 0]
@@ -743,7 +807,7 @@ test("update entry (sell) with other entry existing", () => {
 
   const market = getNewMarket(marketDetails, oracleDetails, marketCreator, creatorFee, liquidityFee, requiredVotes)
   market.balance = getMarketBalance(entries, 3)
-  market.balanceMerkleRoot = getBalanceMerkleRoot(entries)
+  market.balanceMerkleRoot = getBalanceMerkleRoot(entries, version)
 
   const tx = buildNewMarketTx(market)
   fundTx(tx, privateKey, address, utxos)
@@ -904,7 +968,7 @@ test("redeem winning shares", () => {
   resolvedMarket.status.decided = true
   resolvedMarket.status.decision = 2
   resolvedMarket.balance = entry.balance
-  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
 
   const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
@@ -958,7 +1022,7 @@ test("redeem invalid shares", () => {
   resolvedMarket.status.decided = true
   resolvedMarket.status.decision = 2
   resolvedMarket.balance = entry.balance
-  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
 
   const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
@@ -1017,7 +1081,7 @@ test("sell liquidity after market is resolved", () => {
   resolvedMarket.status.decided = true
   resolvedMarket.status.decision = 2
   resolvedMarket.balance = entry.balance
-  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
 
   const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
@@ -1071,7 +1135,7 @@ test("Market creator can sell liquidity after market is resolved", () => {
   resolvedMarket.status.decided = true
   resolvedMarket.status.decision = 2
   resolvedMarket.balance = entry.balance
-  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
 
   const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
@@ -1130,7 +1194,7 @@ test("can't sell liquidity and redeem shares after market is resolved", () => {
   resolvedMarket.status.decided = true
   resolvedMarket.status.decision = 2
   resolvedMarket.balance = entry.balance
-  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
 
   const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
@@ -1184,7 +1248,7 @@ test("Redeem winning shares after loosing shares", () => {
     liquidity: 0,
     shares: [1, 0, 0]
   }
-  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry])
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
 
   const tx = buildNewMarketTx(resolvedMarket)
   fundTx(tx, privateKey, address, utxos)
@@ -1237,7 +1301,7 @@ test("liquidity points generation", () => {
     requiredVotes
   )
 
-  market1.balanceMerkleRoot = getBalanceMerkleRoot([entry1])
+  market1.balanceMerkleRoot = getBalanceMerkleRoot([entry1], version)
   market1.balance = entry1.balance
 
   const tx1 = buildNewMarketTx(market1)
@@ -1296,7 +1360,7 @@ test("liquidity points redeeming", () => {
   )
 
   market1.balance = entry1.balance
-  market1.balanceMerkleRoot = getBalanceMerkleRoot([entry1])
+  market1.balanceMerkleRoot = getBalanceMerkleRoot([entry1], version)
 
   market1.status.accLiquidityFeePool = 1000
   market1.status.liquidityFeePool = 1000

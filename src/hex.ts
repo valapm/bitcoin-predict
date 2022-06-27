@@ -67,7 +67,7 @@ export function hex2IntArray(hex: string, bytes = 1): number[] {
   return hex
     .split("")
     .reduce((shares: string[], n, i) => (!(i % byteChars) ? shares.concat([hex.slice(i, i + byteChars)]) : shares), [])
-    .map(x => parseInt(x, 16))
+    .map(x => parseInt(reverseHex(x), 16))
 }
 
 export function splitHexByNumber(hex: string, length: number): string[] {

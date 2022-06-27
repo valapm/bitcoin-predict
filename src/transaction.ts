@@ -29,7 +29,11 @@ import {
   getIndexToken,
   isValidMarketInit,
   getOpReturnData,
-  getScryptTokenParams
+  getScryptTokenParams,
+  liquidityByteLength,
+  sharesByteLength,
+  getSharesFromHex,
+  market2JSON
 } from "./pm"
 import {
   getOracleDetailsFromHex,
@@ -48,6 +52,7 @@ import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt, hex2Int, t
 import { version, currentMarketContract, currentOracleContract, getArgPos, getMd5 } from "./contracts"
 import semverGte from "semver/functions/gte"
 import { entries } from "lodash"
+import semverLt from "semver/functions/lt"
 
 const feeb = 0.5
 
@@ -252,6 +257,14 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
   const stateData = opReturnData[2]
   const version = getMarketVersion(opReturnData[0])
 
+  let shareBytes = sharesByteLength
+  let liquidityBytes = liquidityByteLength
+
+  if (semverLt(version.version, "0.3.15")) {
+    shareBytes = 1
+    liquidityBytes = 1
+  }
+
   const oracleKeyPos = getArgPos(version, "oracleKey")
   const oracleKeysHex = asm[oracleKeyPos]
   const oracleCount = oracleKeysHex.length / (oracleInfoByteLength * 2)
@@ -262,11 +275,11 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
   const balanceTableRootPos = stateData.length - balanceTableByteLength * 2
   const balanceTableRoot = stateData.slice(balanceTableRootPos)
 
-  const globalShareStatusPos = balanceTableRootPos - globalOptionCount * 2
+  const globalShareStatusPos = balanceTableRootPos - globalOptionCount * shareBytes * 2
   const globalShareStatus = stateData.slice(globalShareStatusPos, balanceTableRootPos)
 
-  const globalLiquidityPos = globalShareStatusPos - 2
-  const globalLiquidity = parseInt(stateData.slice(globalLiquidityPos, globalShareStatusPos), 16)
+  const globalLiquidityPos = globalShareStatusPos - liquidityBytes * 2
+  const globalLiquidity = hex2Int(stateData.slice(globalLiquidityPos, globalShareStatusPos))
 
   const globalLiquidityPointsPos = globalLiquidityPos - 16
   const globalLiquidityPointsHex = stateData.slice(globalLiquidityPointsPos, globalLiquidityPos)
@@ -308,7 +321,7 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
     oracles: getOracleDetailsFromHex(oracleKeysHex, globalOracleStates),
     balance: {
       liquidity: globalLiquidity,
-      shares: hex2IntArray(globalShareStatus)
+      shares: getSharesFromHex(globalShareStatus, version)
     },
     balanceMerkleRoot: balanceTableRoot,
     creator: {
@@ -405,8 +418,10 @@ export function getAddEntryTx(
   const prevMarket = getMarketFromScript(prevTx.outputs[outputIndex].script)
   const optionCount = prevMarket.details.options.length
 
-  const lastEntry = prevEntries.length ? getEntryHex(prevEntries[prevEntries.length - 1]) : "00"
-  const lastMerklePath = getMerklePath(prevEntries, prevEntries.length - 1)
+  const version = getMarketVersion(prevMarket.version)
+
+  const lastEntry = prevEntries.length ? getEntryHex(prevEntries[prevEntries.length - 1], version) : "00"
+  const lastMerklePath = getMerklePath(prevEntries, prevEntries.length - 1, version)
 
   const entry: entry = {
     balance,
@@ -421,7 +436,7 @@ export function getAddEntryTx(
   const newMarket: marketInfo = {
     ...prevMarket,
     balance: newGlobalBalance,
-    balanceMerkleRoot: getMerkleRoot(newEntries)
+    balanceMerkleRoot: getMerkleRoot(newEntries, version)
   }
 
   // console.log(addLeaf(sha256(lastEntry), lastMerklePath, prevMarket.balanceMerkleRoot, sha256(getEntryHex(entry))), getMerkleRoot(newEntries))
@@ -454,7 +469,7 @@ export function getAddEntryTx(
   //     changeSats,
   //     new Bytes(entry.publicKey.toString()),
   //     entry.balance.liquidity,
-  //     new Bytes(getSharesHex(entry.balance.shares)),
+  //     new Bytes(getSharesHex(entry.balance.shares, version)),
   //     new Bytes(lastEntry),
   //     new Bytes(lastMerklePath),
   //     0,
@@ -484,7 +499,7 @@ export function getAddEntryTx(
     changeSats,
     entry.publicKey.toString(),
     entry.balance.liquidity,
-    getSharesHex(entry.balance.shares),
+    getSharesHex(entry.balance.shares, version),
     lastEntry,
     lastMerklePath,
     0,
@@ -513,7 +528,7 @@ export function getAddEntryTx(
   //   changeSats,
   //   new Bytes(entry.publicKey.toString()).toLiteral(),
   //   entry.balance.liquidity,
-  //   new Bytes(getSharesHex(entry.balance.shares)).toLiteral(),
+  //   new Bytes(getSharesHex(entry.balance.shares, version)).toLiteral(),
   //   new Bytes(lastEntry).toLiteral(),
   //   new Bytes(lastMerklePath).toLiteral(),
   //   0,
@@ -536,9 +551,9 @@ export function getAddEntryTx(
   newTx.inputs[0].setScript(unlockingScript)
 
   // console.log(newTx.toString())
-  // console.log(prevTx.outputs[0].satoshis)
+  // console.log(prevTx.outputs[outputIndex].satoshis)
 
-  // const asm = prevTx.outputs[0].script.toASM().split(" ")
+  // const asm = prevTx.outputs[outputIndex].script.toASM().split(" ")
   // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
 
   return newTx
@@ -661,8 +676,8 @@ export function getUpdateEntryTx(
   const newEntries = [...prevEntries]
   newEntries[entryIndex] = newEntry
 
-  const merklePath = getMerklePath(prevEntries, entryIndex)
-  const newMerklePath = getMerklePath(newEntries, entryIndex)
+  const merklePath = getMerklePath(prevEntries, entryIndex, version)
+  const newMerklePath = getMerklePath(newEntries, entryIndex, version)
 
   const redeemedLiquidityPoolSats = redeemLiquidityPoints
     ? Math.floor((newEntryLiquidityPoints / prevMarket.status.liquidityPoints) * prevMarket.status.liquidityFeePool)
@@ -695,7 +710,7 @@ export function getUpdateEntryTx(
   const newMarket: marketInfo = {
     ...prevMarket,
     balance: newGlobalBalance,
-    balanceMerkleRoot: getMerkleRootByPath(sha256(getEntryHex(newEntry)), newMerklePath),
+    balanceMerkleRoot: getMerkleRootByPath(sha256(getEntryHex(newEntry, version)), newMerklePath),
     status: {
       ...prevMarket.status,
       liquidityPoints: newLiquidityPoints,
@@ -770,11 +785,11 @@ export function getUpdateEntryTx(
   //     changeSats,
   //     new Bytes(publicKey.toString()),
   //     newBalance.liquidity,
-  //     new Bytes(getSharesHex(newBalance.shares)),
+  //     new Bytes(getSharesHex(newBalance.shares, version)),
   //     new Bytes(""),
   //     new Bytes(""),
   //     oldEntry.balance.liquidity,
-  //     new Bytes(getSharesHex(oldEntry.balance.shares)),
+  //     new Bytes(getSharesHex(oldEntry.balance.shares, version)),
   //     oldEntry.globalLiqidityFeePoolSave,
   //     oldEntry.liquidityPoints,
   //     redeemLiquidityPoints,
@@ -795,11 +810,11 @@ export function getUpdateEntryTx(
     changeSats,
     publicKey.toString(),
     newBalance.liquidity,
-    getSharesHex(newBalance.shares),
+    getSharesHex(newBalance.shares, version),
     "",
     "",
     oldEntry.balance.liquidity,
-    getSharesHex(oldEntry.balance.shares),
+    getSharesHex(oldEntry.balance.shares, version),
     oldEntry.globalLiqidityFeePoolSave,
     oldEntry.liquidityPoints,
     redeemLiquidityPoints,
@@ -818,27 +833,27 @@ export function getUpdateEntryTx(
   // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
 
   // console.log([
-  //     // new SigHashPreimage(preimage.toString("hex")),
-  //     2, // action = Update entry
-  //     new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
-  //     changeSats,
-  //     new Bytes(publicKey.toString()).toLiteral(),
-  //     newBalance.liquidity,
-  //     new Bytes(getSharesHex(newBalance.shares)).toLiteral(),
-  //     new Bytes("").toLiteral(),
-  //     new Bytes("").toLiteral(),
-  //     oldEntry.balance.liquidity,
-  //     new Bytes(getSharesHex(oldEntry.balance.shares)).toLiteral(),
-  //     oldEntry.globalLiqidityFeePoolSave,
-  //     oldEntry.liquidityPoints,
-  //     redeemLiquidityPoints,
-  //     new Sig(signature.toString("hex")).toLiteral(),
-  //     new Bytes(merklePath).toLiteral(),
-  //     0,
-  //     0n,
-  //     0,
-  //     0,
-  //     newTx.outputs[0].satoshis
+  //   // new SigHashPreimage(preimage.toString("hex")),
+  //   2, // action = Update entry
+  //   new Ripemd160(payoutAddress.hashBuffer.toString("hex")).toLiteral(),
+  //   changeSats,
+  //   new Bytes(publicKey.toString()).toLiteral(),
+  //   newBalance.liquidity,
+  //   new Bytes(getSharesHex(newBalance.shares, version)).toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   oldEntry.balance.liquidity,
+  //   new Bytes(getSharesHex(oldEntry.balance.shares, version)).toLiteral(),
+  //   oldEntry.globalLiqidityFeePoolSave,
+  //   oldEntry.liquidityPoints,
+  //   redeemLiquidityPoints,
+  //   new Sig(signature.toString("hex")).toLiteral(),
+  //   new Bytes(merklePath).toLiteral(),
+  //   0,
+  //   0n,
+  //   0,
+  //   0,
+  //   newTx.outputs[0].satoshis
   // ])
 
   // console.log(newTx.outputs[0].script.toHex())
@@ -859,7 +874,6 @@ export function getUpdateEntryTx(
 
   // const asm = prevTx.outputs[0].script.toASM().split(" ")
   // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
-
 
   return newTx
 }
@@ -1331,14 +1345,12 @@ export function getOracleUpdateTx(
   const chunks = getDataScriptChunks(detailsHash)
   newScript.chunks = newScript.chunks.concat(chunks)
 
-
   // console.log(token.lockingScript.toASM())
   // token.setDataPartInASM(detailsHash)
   // console.log(token.lockingScript.toASM())
 
   const newTx = new bsv.Transaction()
   newTx.addOutput(new bsv.Transaction.Output({ script: newScript, satoshis }))
-
 
   newTx.feePerKb(relayFee * 1000)
 
@@ -1378,7 +1390,6 @@ export function getOracleUpdateTx(
       burnSats
     ])
 
-
     // const unlockingScript = token
     //   .update(
     //     new SigHashPreimage(preimage.toString("hex")),
@@ -1390,24 +1401,20 @@ export function getOracleUpdateTx(
     //   )
     //   .toScript()
 
-      // console.log([
-      //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
-      //   details ? 1 : 2,
-      //   new Bytes(detailsHex).toLiteral(),
-      //   signature.signature.toString(),
-      //   signature.paddingByteCount,
-      //   burnSats
-      // ])
-
-
+    // console.log([
+    //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
+    //   details ? 1 : 2,
+    //   new Bytes(detailsHex).toLiteral(),
+    //   signature.signature.toString(),
+    //   signature.paddingByteCount,
+    //   burnSats
+    // ])
   } else {
     // const unlockingScript = token
     //   .update(new SigHashPreimage(preimage.toString("hex")), 2, new Bytes(""), 0n, 0, burnSats)
     //   .toScript()
 
-      unlockingScriptASM = getAsmFromJS([
-        preimage.toString("hex"), 2, "", 0n, 0, burnSats
-      ])
+    unlockingScriptASM = getAsmFromJS([preimage.toString("hex"), 2, "", 0n, 0, burnSats])
 
     // console.log([
     //   new SigHashPreimage(preimage.toString("hex")).toLiteral(),
@@ -1417,7 +1424,6 @@ export function getOracleUpdateTx(
     //   0,
     //   burnSats
     // ])
-
   }
 
   const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)

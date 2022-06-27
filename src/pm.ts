@@ -7,6 +7,7 @@ import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
 import { AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
 import { currentMarketContract, marketContracts, marketVersion } from "./contracts"
+import semverLt from "semver/functions/lt"
 
 const valaIndexContract = "2af7dfaa7e799e28c7c31fc303dc915c"
 
@@ -93,6 +94,9 @@ export const marketStatusHexLength = 4
 export const entryLiqudityPos = 33
 export const entrySharePos = 34
 
+export const sharesByteLength = 4
+export const liquidityByteLength = 4
+
 // export function getCompiledPM(): void {
 //   const contractPath = require.resolve("scrypt_boilerplate/contracts/predictionMarket.scrypt")
 //   compile({ path: contractPath }, { desc: true })
@@ -159,17 +163,19 @@ export function getNewMarket(
 }
 
 export function getOpReturnData(market: marketInfo): string {
+  const version = getMarketVersion(market.version)
+
   const marketDetailsHex = getMarketDetailsHex(market.details)
   const oracleStatesHex = getOracleStatesHex(market.oracles)
   const marketStatusHex = getMarketStatusHex(market.status)
-  const marketBalanceHex = getBalanceHex(market.balance)
+  const marketBalanceHex = getBalanceHex(market.balance, version)
   const marketBalanceMerkleRoot = String(market.balanceMerkleRoot)
   const marketVotesHex = getVotesHex(market.status.votes)
   const liquidityFeePoolHex = int2Hex(market.status.liquidityFeePool, 5)
   const accLiquidityFeePoolHex = int2Hex(market.status.accLiquidityFeePool, 5)
   const liquidityPointsHex = int2Hex(market.status.liquidityPoints, 8)
 
-  // console.log([
+  // console.log({
   //   marketStatusHex,
   //   oracleStatesHex,
   //   marketVotesHex,
@@ -178,7 +184,7 @@ export function getOpReturnData(market: marketInfo): string {
   //   liquidityPointsHex,
   //   marketBalanceHex,
   //   marketBalanceMerkleRoot
-  // ])
+  // })
 
   const marketDataHex =
     marketStatusHex +
@@ -208,8 +214,6 @@ export function getScryptTokenParams(market: marketInfo) {
 export function getToken(market: marketInfo): PM {
   const Token = buildContractClass(require(`../scripts/${market.version}.json`)) // eslint-disable-line
 
-  // console.log(market.version)
-
   const token = new Token( // eslint-disable-line
     new Bytes(getOracleDetailsHex(market.oracles)), // oracleKeys
     market.details.options.length, // globalOptionCount
@@ -236,23 +240,16 @@ export function getVotesHex(votes: number[]): string {
   return votes.map(vote => int2Hex(vote, 2)).join("")
 }
 
-export function getEntryHex(entry: entry): string {
-  // console.log(
-  //   entry.publicKey.toString() +
-  //     getBalanceHex(entry.balance) +
-  //     int2Hex(entry.globalLiqidityFeePoolSave, 5) +
-  //     int2Hex(entry.liquidityPoints, 8)
-  // )
-
+export function getEntryHex(entry: entry, version: marketVersion): string {
   return (
     entry.publicKey.toString() +
-    getBalanceHex(entry.balance) +
+    getBalanceHex(entry.balance, version) +
     int2Hex(entry.globalLiqidityFeePoolSave, 5) +
     int2Hex(entry.liquidityPoints, 8)
   )
 }
 
-export function getEntryFromHex(bytes: string): entry {
+export function getEntryFromHex(bytes: string, version: marketVersion): entry {
   const feePoolSavePos = bytes.length - 10 - 16
   const liquidityPointsPos = bytes.length - 16
 
@@ -263,34 +260,52 @@ export function getEntryFromHex(bytes: string): entry {
 
   return {
     publicKey,
-    balance: getBalanceFromHex(balanceHex),
+    balance: getBalanceFromHex(balanceHex, version),
     globalLiqidityFeePoolSave: hex2Int(feePoolHex),
     liquidityPoints: hex2Int(liquidityPointsHex)
   }
 }
 
-export function getBalanceHex(balance: balance): string {
-  return int2Hex(balance.liquidity, 1) + getSharesHex(balance.shares)
+export function getBalanceHex(balance: balance, version: marketVersion): string {
+  let bytes = liquidityByteLength
+  if (semverLt(version.version, "0.3.15")) {
+    bytes = 1
+  }
+  return int2Hex(balance.liquidity, bytes) + getSharesHex(balance.shares, version)
 }
 
-export function getBalanceFromHex(bytes: string): balance {
+export function getBalanceFromHex(bytes: string, version: marketVersion): balance {
+  let byteLen = liquidityByteLength
+  if (semverLt(version.version, "0.3.15")) {
+    byteLen = 1
+  }
+  const sharesBytePos = byteLen * 2
   return {
-    liquidity: parseInt(bytes.slice(0, 2), 16),
-    shares: getSharesFromHex(bytes.slice(2))
+    liquidity: hex2Int(bytes.slice(0, sharesBytePos)),
+    shares: getSharesFromHex(bytes.slice(sharesBytePos), version)
   }
 }
 
-export function getSharesHex(shares: number[]): string {
-  return shares.reduce((bytes: string, n) => bytes + int2Hex(n, 1), "")
+export function getSharesHex(shares: number[], version: marketVersion): string {
+  let byteLen = sharesByteLength
+  if (semverLt(version.version, "0.3.15")) {
+    byteLen = 1
+  }
+
+  return shares.reduce((bytes: string, n) => bytes + int2Hex(n, byteLen), "")
 }
 
-export function getSharesFromHex(bytes: string): number[] {
-  return hex2IntArray(bytes)
+export function getSharesFromHex(bytes: string, version: marketVersion): number[] {
+  let byteLen = sharesByteLength
+  if (semverLt(version.version, "0.3.15")) {
+    byteLen = 1
+  }
+  return hex2IntArray(bytes, byteLen)
 }
 
 export function getBalanceHexLength(version: marketVersion, script: bsv.Script): number {
   const optionCountPos = version.args.findIndex(arg => arg === "globalOptionCount") + version.argPos
-  return parseInt(script.toASM()[optionCountPos], 16) * 2
+  return hex2Int(script.toASM()[optionCountPos]) * 2
 }
 
 export function getMarketBalance(entries: entry[], optionCount: number): balance {
@@ -305,17 +320,18 @@ export function getMarketBalance(entries: entry[], optionCount: number): balance
   )
 }
 
-export function getBalanceMerkleRoot(entries: entry[]): hash {
-  return getMerkleRoot([sha256("00"), ...entries.map(entry => sha256(getEntryHex(entry)))])
+export function getBalanceMerkleRoot(entries: entry[], version: marketVersion): hash {
+  return getMerkleRoot([sha256("00"), ...entries.map(entry => sha256(getEntryHex(entry, version)))])
 }
 
-export function getMerklePath(entries: entry[], position: number): string {
-  return getShaMerklePath(position + 1, [sha256("00"), ...entries.map(entry => sha256(getEntryHex(entry)))])
+export function getMerklePath(entries: entry[], position: number, version: marketVersion): string {
+  return getShaMerklePath(position + 1, [sha256("00"), ...entries.map(entry => sha256(getEntryHex(entry, version)))])
 }
 
-export function getMarketBalanceHex(entries: entry[], optionCount: number): string {
-  const marketBalance = getBalanceHex(getMarketBalance(entries, optionCount))
-  const balanceTableRoot = getBalanceMerkleRoot(entries)
+export function getMarketBalanceHex(entries: entry[], optionCount: number, version: marketVersion): string {
+  const marketBalance = getBalanceHex(getMarketBalance(entries, optionCount), version)
+  const balanceTableRoot = getBalanceMerkleRoot(entries, version)
+
   return marketBalance + String(balanceTableRoot)
 }
 
@@ -342,9 +358,9 @@ export function getMarketStatusfromHex(
   // )
 
   return {
-    decided: Boolean(parseInt(decisionHex.slice(0, 2), 16)),
-    decision: parseInt(decisionHex.slice(2, 4), 16),
-    votes: splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => parseInt(reverseHex(n), 16)),
+    decided: Boolean(hex2Int(decisionHex.slice(0, 2))),
+    decision: hex2Int(decisionHex.slice(2, 4)),
+    votes: splitHexByNumber(votesHex, voteCountByteLen * 2).map(n => hex2Int(n)),
     liquidityFeePool: hex2Int(liquidityFeePoolHex),
     accLiquidityFeePool: hex2Int(accLiquidityFeePoolHex),
     liquidityPoints: hex2Int(liquidityPointsHex)
@@ -407,6 +423,8 @@ export function isValidMarketInfo(market: marketInfo): boolean {
 }
 
 export function validateEntries(market: marketInfo, entries: entry[]): boolean {
+  const version = getMarketVersion(market.version)
+
   const optionCount = market.details.options.length
   const calculatedBalance = getMarketBalance(entries, optionCount)
 
@@ -416,7 +434,7 @@ export function validateEntries(market: marketInfo, entries: entry[]): boolean {
     : market.balance.shares.every((n, i) => n === calculatedBalance.shares[i])
 
   // console.log({entries: JSON.stringify(entries.map(e => e.balance))})
-  const hasCorrectBalanceMerkleRoot = market.balanceMerkleRoot === getBalanceMerkleRoot(entries)
+  const hasCorrectBalanceMerkleRoot = market.balanceMerkleRoot === getBalanceMerkleRoot(entries, version)
 
   // console.log({
   //   hasCorrectLiquidity,
@@ -456,4 +474,13 @@ export function isValidMarketInit(market: marketInfo): boolean {
 
 export function isValidMarketInitEntry(entry: entry): boolean {
   return entry.globalLiqidityFeePoolSave === 0 && entry.liquidityPoints === 0
+}
+
+export function market2JSON(market: marketInfo): string {
+  return JSON.parse(
+    JSON.stringify(
+      market,
+      (key, value) => (typeof value === "bigint" ? value.toString() : value) // return everything else unchanged
+    )
+  )
 }
