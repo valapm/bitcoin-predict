@@ -19,7 +19,8 @@ import {
   getMarketCreationTx,
   isValidMarketInitOutput,
   isValidOracleInitOutput,
-  getDust
+  getDust,
+  getUpdateMarketSettingsTx
 } from "../src/transaction"
 import { RabinSignature, rabinPrivKey, rabinPubKey } from "rabinsig"
 import {
@@ -40,6 +41,8 @@ import { getSignature, oracleDetail } from "../src/oracle"
 import { cloneDeep } from "lodash"
 import { addLeaf } from "../src/merkleTree"
 import { marketVersion } from "../src/contracts"
+import { toHex } from "../src/hex"
+import { sha256 } from "../src/sha"
 
 const rabin = new RabinSignature()
 
@@ -1763,4 +1766,33 @@ test("build and fund oracle details update transaction", () => {
 
   const tx2 = getOracleUpdateDetailsTx(tx, 1, details, rabinPrivKey1)
   expect(isValidUpdateTx(tx2, tx, 1) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
+})
+
+test("Update market settings", () => {
+  const tx = buildNewMarketTx(populatedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newSettings = {
+    hidden: true
+  }
+
+  const newTx = getUpdateMarketSettingsTx(tx, newSettings, privateKey)
+
+  expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
+
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  expect(newMarket.settingsHash).toBe(sha256(toHex(JSON.stringify(newSettings))))
+})
+
+test("Only market creator can update market settings", () => {
+  const tx = buildNewMarketTx(populatedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newSettings = {
+    hidden: true
+  }
+
+  const privateKey2 = bsv.PrivateKey.fromString("L4wrW1PZktcohFrbuACjJVPnEZWnfm9tRbh6qoiVfy1dDPfkVVpC")
+
+  expect(() => getUpdateMarketSettingsTx(tx, newSettings, privateKey2)).toThrow()
 })

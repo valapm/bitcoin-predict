@@ -84,6 +84,7 @@ export type marketInfo = {
   creatorFee: number
   requiredVotes: number
   liquidityFee: number
+  settingsHash?: string
 }
 
 export const balanceTableByteLength = 32
@@ -158,7 +159,8 @@ export function getNewMarket(
     creator,
     creatorFee,
     liquidityFee,
-    requiredVotes
+    requiredVotes,
+    settingsHash: sha256("00")
   }
 }
 
@@ -196,7 +198,11 @@ export function getOpReturnData(market: marketInfo): string {
     marketBalanceHex +
     marketBalanceMerkleRoot
 
-  return `${market.version} ${marketDetailsHex} ${marketDataHex}`
+  if (semverLt(version.version, "0.4.0")) {
+    return `${market.version} ${marketDetailsHex} ${marketDataHex}`
+  }
+
+  return `${market.version} ${marketDetailsHex} ${market.settingsHash} ${marketDataHex}`
 }
 
 export function getScryptTokenParams(market: marketInfo) {

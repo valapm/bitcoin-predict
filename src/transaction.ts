@@ -61,7 +61,7 @@ export const DUST = 546
 
 const Signature = bsv.crypto.Signature
 
-const opReturnDataLength = 3
+const opReturnDataLength = 4
 
 // export function getLockingScript(market: marketInfo): bsv.Script {
 //   const asm = getLockingScriptASM(market.oracles).join(" ")
@@ -124,7 +124,7 @@ export function getAsmFromJS(inputs: any[]): string {
 }
 
 function removeOpReturn(script: bsv.Script): bsv.Script {
-  const opReturnIndex = script.chunks.findIndex(chunk => chunk.opcodenum === 106)
+  const opReturnIndex = getOpReturnPos(script)
   const newChunks = script.chunks.slice(0, opReturnIndex + 1)
   return new bsv.Script({ chunks: newChunks })
 }
@@ -251,10 +251,22 @@ export function getPreimage(
   return preimageBuf
 }
 
+function getOpReturnPos(script: bsv.Script): number {
+  let i = script.chunks.length - 1
+  while (i >= 0) {
+    if (script.chunks[i].opcodenum === 106) return i
+    i--
+  }
+  throw new Error("No OP_RETURN found")
+}
+
 export function getMarketFromScript(script: bsv.Script): marketInfo {
+  const opReturnIndex = getOpReturnPos(script)
   const asm = script.toASM().split(" ")
-  const opReturnData = asm.slice(asm.length - opReturnDataLength, asm.length)
-  const stateData = opReturnData[2]
+  const chunks = script.chunks.slice(opReturnIndex + 1)
+  const opReturnData = new bsv.Script({ chunks }).toASM().split(" ")
+
+  const stateData = opReturnData[opReturnData.length - 1]
   const version = getMarketVersion(opReturnData[0])
 
   let shareBytes = sharesByteLength
@@ -308,7 +320,7 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
   const gobalDecisionPos = oracleStatesPos - 4
   const globalDecisionState = stateData.slice(gobalDecisionPos, oracleStatesPos)
 
-  return {
+  const market: marketInfo = {
     version: opReturnData[0],
     details: getMarketDetailsFromHex(opReturnData[1]),
     status: getMarketStatusfromHex(
@@ -332,6 +344,12 @@ export function getMarketFromScript(script: bsv.Script): marketInfo {
     requiredVotes: getIntFromOP(asm[getArgPos(version, "requiredVotes")]),
     liquidityFee: getIntFromOP(asm[getArgPos(version, "liquidityFeeRate")]) / 100
   }
+
+  if (semverGte(version.version, "0.4.0")) {
+    market.settingsHash = opReturnData[2]
+  }
+
+  return market
 }
 
 export function isValidUpdateTx(
@@ -492,7 +510,7 @@ export function getAddEntryTx(
   //   console.log(prevEntries.map(entry => sha256(getEntryHex(entry))))
   // }
 
-  const unlockingScriptASM = getAsmFromJS([
+  const unlockArgs = [
     preimage.toString("hex"),
     1, // action = Add entry
     payoutAddress.hashBuffer.toString("hex"),
@@ -514,7 +532,13 @@ export function getAddEntryTx(
     0,
     0,
     newTx.outputs[0].satoshis
-  ])
+  ]
+
+  if (semverGte(version.version, "0.4.0")) {
+    unlockArgs.push("00")
+  }
+
+  const unlockingScriptASM = getAsmFromJS(unlockArgs)
 
   const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
 
@@ -803,7 +827,7 @@ export function getUpdateEntryTx(
   //   )
   // .toScript()
 
-  const unlockingScriptASM = getAsmFromJS([
+  const unlockArgs = [
     preimage.toString("hex"),
     2, // action = Update entry
     payoutAddress.hashBuffer.toString("hex"),
@@ -825,7 +849,13 @@ export function getUpdateEntryTx(
     0,
     0,
     newTx.outputs[0].satoshis
-  ])
+  ]
+
+  if (semverGte(version.version, "0.4.0")) {
+    unlockArgs.push("00")
+  }
+
+  const unlockingScriptASM = getAsmFromJS(unlockArgs)
 
   const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
 
@@ -890,6 +920,7 @@ export function getOracleCommitTx(
   // TODO: Offer option to fund transaction separately?
 
   const prevMarket = getMarketFromScript(prevTx.outputs[outputIndex].script)
+  const version = getMarketVersion(prevMarket.version)
   // const token = getToken(prevMarket)
 
   const rabin = new RabinSignature()
@@ -948,7 +979,7 @@ export function getOracleCommitTx(
   //   )
   //   .toScript()
 
-  const unlockingScriptASM = getAsmFromJS([
+  const unlockArgs = [
     preimage.toString("hex"),
     3, // action = Update entry
     "00",
@@ -970,7 +1001,13 @@ export function getOracleCommitTx(
     signature.paddingByteCount,
     0,
     newTx.outputs[0].satoshis
-  ])
+  ]
+
+  if (semverGte(version.version, "0.4.0")) {
+    unlockArgs.push("00")
+  }
+
+  const unlockingScriptASM = getAsmFromJS(unlockArgs)
 
   const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
 
@@ -1020,6 +1057,7 @@ export function getOracleVoteTx(
   // TODO: Offer option to fund transaction separately?
 
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
+  const version = getMarketVersion(prevMarket.version)
   // const token = getToken(prevMarket)
 
   const rabin = new RabinSignature()
@@ -1093,7 +1131,7 @@ export function getOracleVoteTx(
   //   )
   //   .toScript()
 
-  const unlockingScriptASM = getAsmFromJS([
+  const unlockArgs = [
     preimage.toString("hex"),
     4, // action = Update entry
     "00",
@@ -1115,7 +1153,13 @@ export function getOracleVoteTx(
     signature.paddingByteCount,
     vote,
     newTx.outputs[0].satoshis
-  ])
+  ]
+
+  if (semverGte(version.version, "0.4.0")) {
+    unlockArgs.push("00")
+  }
+
+  const unlockingScriptASM = getAsmFromJS(unlockArgs)
 
   const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
 
@@ -1454,6 +1498,100 @@ export function getOracleUpdateDetailsTx(
   return getOracleUpdateTx(prevTx, outputIndex, 0, details, rabinPrivKey)
 }
 
+export function getUpdateMarketSettingsTx(
+  prevTx: bsv.Transaction,
+  settings: any,
+  privateKey: bsv.PrivateKey,
+  feePerByte = feeb,
+  outputIndex = 0
+) {
+  const prevMarket = getMarketFromScript(prevTx.outputs[outputIndex].script)
+  const version = getMarketVersion(prevMarket.version)
+
+  if (semverLt(version.version, "0.4.0")) {
+    throw new Error("Market version does not support settings")
+  }
+
+  const settingsHex = toHex(JSON.stringify(settings))
+  const settingsHash = sha256(settingsHex)
+
+  if (privateKey.publicKey.toString() !== prevMarket.creator.pubKey.toString()) {
+    throw new Error("Only market creator can update settings")
+  }
+
+  const newMarket = { ...prevMarket, settingsHash }
+  const newTx = getUpdateMarketTx(prevTx, newMarket, 0, feePerByte)
+
+  const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
+  const preimage = getPreimage(prevTx, newTx, sighashType)
+
+  const signature = getSignature(preimage, privateKey, sighashType)
+
+  const unlockingScriptASM = getAsmFromJS([
+    preimage.toString("hex"),
+    5, // action = Update settings
+    "00",
+    0,
+    "",
+    0,
+    "",
+    "",
+    "",
+    0,
+    "",
+    0,
+    0,
+    false,
+    signature.toString("hex"),
+    "",
+    0,
+    0n,
+    0,
+    0,
+    newTx.outputs[0].satoshis,
+    settingsHex
+  ])
+
+  const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
+  newTx.inputs[0].setScript(unlockingScript)
+
+  // console.log(getScryptTokenParams(prevMarket))
+  // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
+
+  // console.log([
+  //   // new SigHashPreimage(preimage.toString("hex")).toLiteral(),
+  //   5, // action = Update settings
+  //   new Ripemd160("00").toLiteral(),
+  //   0,
+  //   new Bytes("").toLiteral(),
+  //   0,
+  //   new Bytes("").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   0,
+  //   new Bytes("").toLiteral(),
+  //   0,
+  //   0,
+  //   false,
+  //   new Sig(signature.toString("hex")).toLiteral(),
+  //   new Bytes("").toLiteral(),
+  //   0,
+  //   0n,
+  //   0,
+  //   0,
+  //   newTx.outputs[0].satoshis,
+  //   new Bytes(settingsHex).toLiteral()
+  // ])
+
+  // console.log(newTx.toString())
+  // console.log(prevTx.outputs[0].satoshis)
+
+  // const asm = prevTx.outputs[0].script.toASM().split(" ")
+  // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
+
+  return newTx
+}
+
 export function isValidOracleInitOutput(tx: bsv.Transaction, outputIndex = 0): boolean {
   const script = tx.outputs[outputIndex].script
   const asm = script.toASM().split(" ")
@@ -1470,6 +1608,12 @@ export function isValidMarketInitOutput(tx: bsv.Transaction, outputIndex = 0): b
     version = getMarketVersion(market.version)
   } catch (e) {
     return false
+  }
+
+  if (semverGte(version.version, "0.4.0")) {
+    if (market.settingsHash !== sha256("00")) return false
+    const opReturnLength = script.chunks.length - getOpReturnPos(script) - 1
+    if (opReturnLength !== 4) return false
   }
 
   if (!isValidScript(script, version)) return false
