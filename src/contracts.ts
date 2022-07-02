@@ -25,7 +25,7 @@ export const marketContracts: { [indentifier: string]: marketVersion } = {
   "42b17ee5dd54148597ec94ece21228c0": {
     identifier: "42b17ee5dd54148597ec94ece21228c0",
     version: "0.4.0",
-    argPos: 16,
+    argPos: 18,
     args: [
       "oracleKey",
       "globalOptionCount",
@@ -41,8 +41,8 @@ export const marketContracts: { [indentifier: string]: marketVersion } = {
       devFee: 0.2,
       developerPayoutAddress: "0053faba2fb9a28dfa94d93270079cd2aa270180f3"
     },
-    md5: "58bbc7e0d8c185a4dca1647f032a8e14",
-    length: 83535
+    md5: "b8e9ea618efbfdbc02c4ad61cbb3d34d",
+    length: 83558
   },
   "73145fea9a249918adf07357674cf33d": {
     identifier: "73145fea9a249918adf07357674cf33d",

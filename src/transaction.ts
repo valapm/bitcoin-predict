@@ -54,6 +54,8 @@ import semverGte from "semver/functions/gte"
 import { entries } from "lodash"
 import semverLt from "semver/functions/lt"
 
+const valaId = "00b0b47b2c25ca119b62172d53055f4742df365ddc"
+
 const feeb = 0.5
 
 // TODO: Is at 135 now, 0 @ end 2021
@@ -1614,6 +1616,7 @@ export function isValidMarketInitOutput(tx: bsv.Transaction, outputIndex = 0): b
     if (market.settingsHash !== sha256("00")) return false
     const opReturnLength = script.chunks.length - getOpReturnPos(script) - 1
     if (opReturnLength !== 4) return false
+    if (script.chunks[0].buf.toString("hex") !== valaId) return false
   }
 
   if (!isValidScript(script, version)) return false
