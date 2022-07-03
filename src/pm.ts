@@ -490,3 +490,16 @@ export function market2JSON(market: marketInfo): string {
     )
   )
 }
+
+export function getSettingsFromScript(inputScript: bsv.Script): any {
+  const settingsHex = inputScript.toASM().split(" ")[21]
+
+  let settings
+  try {
+    settings = JSON.parse(fromHex(settingsHex))
+  } catch (e) {
+    throw new Error("Failed to parse new settings hex")
+  }
+
+  return settings
+}
