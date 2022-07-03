@@ -26,7 +26,6 @@ import {
   voteCountByteLen,
   balanceTableByteLength,
   getSharesHex,
-  getIndexToken,
   isValidMarketInit,
   getOpReturnData,
   getScryptTokenParams,
@@ -1290,7 +1289,6 @@ export function addValaIndex(
 ): bsv.Transaction {
   // console.log("index script length", prevValaIndexTx.outputs[prevValaIndexOutputIndex].script.toASM().length)
   // console.log("index script index", prevValaIndexOutputIndex)
-  const indexToken = getIndexToken()
 
   const input = bsv.Transaction.Input.fromObject({
     prevTxId: prevValaIndexTx.hash,
@@ -1307,7 +1305,9 @@ export function addValaIndex(
   const inputIndex = tx.inputs.length - 1
 
   const satoshis = prevValaIndexTx.outputs[prevValaIndexOutputIndex].satoshis
-  const output = new bsv.Transaction.Output({ script: indexToken.lockingScript, satoshis })
+
+  const indexLockingScript = prevValaIndexTx.outputs[0].script
+  const output = new bsv.Transaction.Output({ script: indexLockingScript, satoshis })
 
   if (inputIndex < tx.outputs.length) {
     // With SIGHASH_SINGLE, output needs to be same index as input
@@ -1328,7 +1328,7 @@ export function addValaIndex(
   // console.log("Preimage length:", preimage.toString("hex").length)
   // console.log(preimage.toString("hex"))
 
-  const unlockingScript = indexToken.update(new SigHashPreimage(preimage.toString("hex"))).toScript()
+  const unlockingScript = bsv.Script.fromASM(getAsmFromJS([preimage.toString("hex")]))
 
   tx.inputs[inputIndex].setScript(unlockingScript)
 

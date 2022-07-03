@@ -31,7 +31,7 @@ import {
   getNewMarket,
   creatorInfo,
   marketDetails,
-  getIndexToken,
+  getNewIndexScript,
   market2JSON,
   getMarketVersion
 } from "../src/pm"
@@ -92,9 +92,9 @@ let oracleDetails: oracleDetail[],
   populatedMarket: marketInfo,
   version: marketVersion
 
-const valaIndexToken = getIndexToken()
+const valaIndexScript = getNewIndexScript()
 const valaIndexTx = new bsv.Transaction()
-valaIndexTx.addOutput(new bsv.Transaction.Output({ script: valaIndexToken.lockingScript, satoshis: DUST }))
+valaIndexTx.addOutput(new bsv.Transaction.Output({ script: valaIndexScript, satoshis: DUST }))
 
 beforeEach(() => {
   oracleDetails = [
@@ -1704,6 +1704,15 @@ test("get function from script", () => {
   expect(getFunctionID(newTx.inputs[0].script)).toBe(1)
 })
 
+test("Add multiple markets to the vala index", () => {
+  const tx = getMarketCreationTx(market, valaIndexTx)
+  fundTx(tx, privateKey, address, utxos)
+  const tx2 = getMarketCreationTx(market, tx)
+  fundTx(tx2, privateKey, address, utxos)
+  // console.log(tx2.toString())
+  expect(isValidUpdateTx(tx2, tx) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
+})
+
 test("build and fund oracle transaction", () => {
   const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
@@ -1712,7 +1721,7 @@ test("build and fund oracle transaction", () => {
   expect(isValidOracleInitOutput(tx, 1)).toBe(true)
 })
 
-test("Add multiple oracles to vala index", () => {
+test("Add multiple oracles to the vala index", () => {
   const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
   const tx2 = getNewOracleTx(rabinPubKey1, tx)

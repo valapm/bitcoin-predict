@@ -237,9 +237,9 @@ export function getToken(market: marketInfo): PM {
   return token
 }
 
-export function getIndexToken(): Index {
-  const ValaIndexToken = buildContractClass(require(`../scripts/${valaIndexContract}.json`)) // eslint-disable-line
-  return new ValaIndexToken() as Index // eslint-disable-line
+export function getNewIndexScript(): bsv.Script {
+  const contract = require(`../scripts/${valaIndexContract}.json`)
+  return bsv.Script.fromASM(contract.asm)
 }
 
 export function getVotesHex(votes: number[]): string {
