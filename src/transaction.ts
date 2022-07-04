@@ -1522,10 +1522,10 @@ export function getUpdateMarketSettingsTx(
   }
 
   const newMarket = { ...prevMarket, settingsHash }
-  const newTx = getUpdateMarketTx(prevTx, newMarket, 0, feePerByte)
+  const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex, feePerByte)
 
   const sighashType = Signature.SIGHASH_ANYONECANPAY | Signature.SIGHASH_SINGLE | Signature.SIGHASH_FORKID
-  const preimage = getPreimage(prevTx, newTx, sighashType)
+  const preimage = getPreimage(prevTx, newTx, sighashType, outputIndex)
 
   const signature = getSignature(preimage, privateKey, sighashType)
 
@@ -1558,8 +1558,8 @@ export function getUpdateMarketSettingsTx(
   newTx.inputs[0].setScript(unlockingScript)
 
   // console.log(getScryptTokenParams(prevMarket))
-  // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
 
+  // console.log(new SigHashPreimage(preimage.toString("hex")).toLiteral())
   // console.log([
   //   // new SigHashPreimage(preimage.toString("hex")).toLiteral(),
   //   5, // action = Update settings
@@ -1586,9 +1586,9 @@ export function getUpdateMarketSettingsTx(
   // ])
 
   // console.log(newTx.toString())
-  // console.log(prevTx.outputs[0].satoshis)
+  // console.log(prevTx.outputs[outputIndex].satoshis)
 
-  // const asm = prevTx.outputs[0].script.toASM().split(" ")
+  // const asm = prevTx.outputs[outputIndex].script.toASM().split(" ")
   // console.log(asm.slice(asm.length - opReturnDataLength, asm.length).join(" "))
 
   return newTx

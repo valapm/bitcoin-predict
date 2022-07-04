@@ -44,6 +44,8 @@ import { marketVersion } from "../src/contracts"
 import { toHex } from "../src/hex"
 import { sha256 } from "../src/sha"
 
+const feeb = 0.5
+
 const rabin = new RabinSignature()
 
 const rabinPrivKey1: rabinPrivKey = {
@@ -1778,16 +1780,58 @@ test("build and fund oracle details update transaction", () => {
 })
 
 test("Update market settings", () => {
-  const tx = buildNewMarketTx(populatedMarket)
+  // const tx = buildNewMarketTx(populatedMarket)
+  const tx = getMarketCreationTx(populatedMarket, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
   const newSettings = {
     hidden: true
   }
 
-  const newTx = getUpdateMarketSettingsTx(tx, newSettings, privateKey)
+  // const asm = tx.outputs[1].script.toASM().split(" ")
+  // console.log(asm[asm.length - 1], asm[asm.length - 1].length)
 
-  expect(isValidMarketUpdateTx(newTx, tx, entries)).toBe(true)
+  const newTx = getUpdateMarketSettingsTx(tx, newSettings, privateKey, feeb, 1)
+
+  expect(isValidMarketUpdateTx(newTx, tx, entries, 1)).toBe(true)
+
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  expect(newMarket.settingsHash).toBe(sha256(toHex(JSON.stringify(newSettings))))
+})
+
+test("Update market settings with short state hex string", () => {
+  // const tx = buildNewMarketTx(populatedMarket)
+
+  const longMarket = getNewMarket(
+    {
+      ...marketDetails,
+      options: [{ name: "1" }, { name: "2" }]
+    },
+    [
+      {
+        ...oracleDetails[0],
+        votes: 100
+      }
+    ],
+    marketCreator,
+    creatorFee,
+    liquidityFee,
+    requiredVotes
+  )
+
+  const tx = getMarketCreationTx(longMarket, valaIndexTx)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newSettings = {
+    hidden: true
+  }
+
+  // const asm = tx.outputs[1].script.toASM().split(" ")
+  // console.log(asm[asm.length - 1], asm[asm.length - 1].length)
+
+  const newTx = getUpdateMarketSettingsTx(tx, newSettings, privateKey, feeb, 1)
+
+  expect(isValidMarketUpdateTx(newTx, tx, [], 1)).toBe(true)
 
   const newMarket = getMarketFromScript(newTx.outputs[0].script)
   expect(newMarket.settingsHash).toBe(sha256(toHex(JSON.stringify(newSettings))))
