@@ -139,12 +139,12 @@ export const currentMarketContract = marketContracts["12a4fc473874e063790ed04714
 export const oracleContracts: { [indentifier: string]: version } = {
   "5d9a258cb212c53d9d3c5c71a0c4daeb": {
     identifier: "5d9a258cb212c53d9d3c5c71a0c4daeb",
-    version: "0.1.2",
-    argPos: 6,
+    version: "0.1.3",
+    argPos: 8,
     args: ["rabinPubKey"],
     options: {},
-    md5: "322899aaa78c025108695f52bbdf68d5",
-    length: 1449
+    md5: "1807af1e72025021c735567fa8fbd8a1",
+    length: 1472
   },
   "02fbca51c5c8820b884bcc3d4481a252": {
     identifier: "02fbca51c5c8820b884bcc3d4481a252",

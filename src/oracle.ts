@@ -2,11 +2,12 @@ import { RabinSignature, rabinSig, rabinPrivKey, rabinPubKey } from "rabinsig"
 import { buildContractClass, SigHashPreimage, Bytes } from "scryptlib"
 import { AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
+import semverLt from "semver/functions/lt"
 
 import { int2Hex, hex2BigInt, hex2Bool, bool2Hex, splitHexByNumber } from "./hex"
 import { num2bin } from "scryptlib"
 import { sha256 } from "./sha"
-import { currentOracleContract} from "./contracts"
+import { currentOracleContract, oracleContracts, version } from "./contracts"
 
 export type oracleDetail = { pubKey: rabinPubKey; votes: number; committed?: boolean; voted?: boolean }
 // export type oracleState = {}
@@ -109,12 +110,25 @@ interface oracleContract extends AbstractContract {
   ): FunctionCall
 }
 
-export function getOracleToken(pubKey: rabinPubKey): oracleContract {
-  const Token = buildContractClass(require(`../scripts/${currentOracleContract.identifier}.json`)) // eslint-disable-line
+export function getOracleToken(pubKey: rabinPubKey, version = currentOracleContract): oracleContract {
+  const Token = buildContractClass(require(`../scripts/${version.identifier}.json`)) // eslint-disable-line
 
   const token = new Token(pubKey) as oracleContract // eslint-disable-line
 
-  token.setDataPartInASM(sha256("00"))
+  let datapart
+  if (semverLt(version.version, "0.1.3")) {
+    datapart = sha256("00")
+  } else {
+    datapart = `${version.identifier} ${sha256("00")}`
+  }
+
+  token.setDataPartInASM(datapart)
 
   return token
+}
+
+export function getOracleVersion(identifier: string): version {
+  const v = oracleContracts[identifier]
+  if (v) return v
+  throw new Error(`Oracle version ${identifier} not supported`)
 }

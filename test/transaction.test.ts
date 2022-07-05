@@ -40,7 +40,7 @@ import bsv from "bsv"
 import { getSignature, oracleDetail } from "../src/oracle"
 import { cloneDeep } from "lodash"
 import { addLeaf } from "../src/merkleTree"
-import { marketVersion } from "../src/contracts"
+import { marketVersion, oracleContracts, currentOracleContract } from "../src/contracts"
 import { toHex } from "../src/hex"
 import { sha256 } from "../src/sha"
 
@@ -1770,6 +1770,23 @@ test("build and fund oracle burn update transaction", () => {
 test("build and fund oracle details update transaction", () => {
   const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
+
+  expect(isValidOracleInitOutput(tx, 1))
+
+  const details = {
+    domain: "example.com"
+  }
+
+  const tx2 = getOracleUpdateDetailsTx(tx, 1, details, rabinPrivKey1)
+  expect(isValidUpdateTx(tx2, tx, 1) && tx2.verify() === true && !tx2.getSerializationError()).toBe(true)
+})
+
+test("build and fund oracle details update transaction with old contract version", () => {
+  const oracleVersion = oracleContracts["02fbca51c5c8820b884bcc3d4481a252"]
+  const tx = getNewOracleTx(rabinPubKey1, valaIndexTx, 0, feeb, oracleVersion)
+  fundTx(tx, privateKey, address, utxos)
+
+  expect(isValidOracleInitOutput(tx, 1))
 
   const details = {
     domain: "example.com"

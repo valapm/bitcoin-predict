@@ -40,7 +40,8 @@ import {
   oracleStateByteLength,
   commitmentHash,
   getSignature as getOracleSig,
-  getOracleToken
+  getOracleToken,
+  getOracleVersion
 } from "./oracle"
 import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
 import { getMerkleRootByPath, addLeaf, verifyLeaf } from "./merkleTree"
@@ -1339,18 +1340,16 @@ export function getNewOracleTx(
   pubKey: rabinPubKey,
   prevValaIndexTx: bsv.Transaction,
   prevValaIndexOutputIndex = 0,
-  relayFee = feeb
+  relayFee = feeb,
+  version = currentOracleContract
 ): bsv.Transaction {
-  const token = getOracleToken(pubKey)
-  token.setDataPartInASM(sha256("00"))
+  const token = getOracleToken(pubKey, version)
 
   // const asm = token.lockingScript.toASM().split(" ")
   // console.log(asm[asm.length - 1])
 
   const tx = new bsv.Transaction()
-  let output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: 123456789 })
-
-  output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: 1 })
+  const output = new bsv.Transaction.Output({ script: token.lockingScript, satoshis: 1 })
 
   tx.addOutput(output)
 
@@ -1376,9 +1375,6 @@ export function getOracleUpdateTx(
   rabinPrivKey?: rabinPrivKey,
   relayFee = feeb
 ): bsv.Transaction {
-  const pubKeyHex = prevTx.outputs[outputIndex].script.toASM().split(" ")[3]
-  const pubKey = hex2BigInt(pubKeyHex)
-
   const satoshis = prevTx.outputs[outputIndex].satoshis + burnSats
 
   const detailsHex = details ? toHex(JSON.stringify(details)) : "00"
@@ -1387,7 +1383,8 @@ export function getOracleUpdateTx(
   // const token = getOracleToken(pubKey)
 
   // @ts-ignore
-  const newScript = removeOpReturn(prevTx.outputs[outputIndex].script)
+  const prevChunks = prevTx.outputs[outputIndex].script.chunks
+  const newScript = new bsv.Script({ chunks: prevChunks.slice(0, prevChunks.length - 1) })
   const chunks = getDataScriptChunks(detailsHash)
   newScript.chunks = newScript.chunks.concat(chunks)
 
@@ -1597,6 +1594,18 @@ export function getUpdateMarketSettingsTx(
 export function isValidOracleInitOutput(tx: bsv.Transaction, outputIndex = 0): boolean {
   const script = tx.outputs[outputIndex].script
   const asm = script.toASM().split(" ")
+
+  const opReturnPos = getOpReturnPos(script)
+
+  if (asm.slice(opReturnPos + 1).length > 1) {
+    const versionId = asm[opReturnPos + 1]
+    const version = getOracleVersion(versionId)
+
+    if (semverGte(version.version, "0.1.3")) {
+      if (script.chunks[0].buf.toString("hex") !== valaId) return false
+    }
+  }
+
   return isValidScript(script, currentOracleContract) && asm[asm.length - 1] === sha256("00")
 }
 
