@@ -1605,7 +1605,12 @@ export function isValidOracleInitOutput(tx: bsv.Transaction, outputIndex = 0): b
   let version
   if (asm.slice(opReturnPos + 1).length > 1) {
     const versionId = asm[opReturnPos + 1]
-    version = getOracleVersion(versionId)
+
+    try {
+      version = getOracleVersion(versionId)
+    } catch (e) {
+      return false
+    }
 
     if (semverGte(version.version, "0.1.3")) {
       if (script.chunks[0].buf.toString("hex") !== valaId) return false
