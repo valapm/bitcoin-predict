@@ -1597,16 +1597,19 @@ export function isValidOracleInitOutput(tx: bsv.Transaction, outputIndex = 0): b
 
   const opReturnPos = getOpReturnPos(script)
 
+  let version
   if (asm.slice(opReturnPos + 1).length > 1) {
     const versionId = asm[opReturnPos + 1]
-    const version = getOracleVersion(versionId)
+    version = getOracleVersion(versionId)
 
     if (semverGte(version.version, "0.1.3")) {
       if (script.chunks[0].buf.toString("hex") !== valaId) return false
     }
+  } else {
+    version = getOracleVersion("02fbca51c5c8820b884bcc3d4481a252")
   }
 
-  return isValidScript(script, currentOracleContract) && asm[asm.length - 1] === sha256("00")
+  return isValidScript(script, version) && asm[asm.length - 1] === sha256("00")
 }
 
 export function isValidMarketInitOutput(tx: bsv.Transaction, outputIndex = 0): boolean {

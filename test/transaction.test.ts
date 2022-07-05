@@ -1771,7 +1771,7 @@ test("build and fund oracle details update transaction", () => {
   const tx = getNewOracleTx(rabinPubKey1, valaIndexTx)
   fundTx(tx, privateKey, address, utxos)
 
-  expect(isValidOracleInitOutput(tx, 1))
+  expect(isValidOracleInitOutput(tx, 1)).toBe(true)
 
   const details = {
     domain: "example.com"
@@ -1786,7 +1786,7 @@ test("build and fund oracle details update transaction with old contract version
   const tx = getNewOracleTx(rabinPubKey1, valaIndexTx, 0, feeb, oracleVersion)
   fundTx(tx, privateKey, address, utxos)
 
-  expect(isValidOracleInitOutput(tx, 1))
+  expect(isValidOracleInitOutput(tx, 1)).toBe(true)
 
   const details = {
     domain: "example.com"
