@@ -64,6 +64,7 @@ export const DUST = 546
 const Signature = bsv.crypto.Signature
 
 const opReturnDataLength = 4
+const liquidityPointsScalingFactor = 64
 
 // export function getLockingScript(market: marketInfo): bsv.Script {
 //   const asm = getLockingScriptASM(market.oracles).join(" ")
@@ -617,11 +618,11 @@ export function getUpdateEntryTx(
     const winningShares = oldEntry.balance.shares[decision]
     const redeemed = winningShares - newBalance.shares[decision]
 
+    if (!newBalance.shares.every((newShares, index) => index === decision || newShares === 0))
+      throw new Error("Loosing shares must be set to 0")
+
     if (redeemed !== 0) {
       // Redeem winning shares
-
-      if (!newBalance.shares.every((newShares, index) => index === decision || newShares === 0))
-        throw new Error("Loosing shares must be set to 0")
 
       newGlobalBalance = {
         liquidity: prevMarket.balance.liquidity,
@@ -683,18 +684,41 @@ export function getUpdateEntryTx(
     }
   }
 
-  const liquidityFee = redeemSats > 0 ? Math.floor((redeemSats * prevMarket.liquidityFee) / 100) : 0
+  // Calculate liquidity fee
+  const liquiditySatFee = redeemSats > 0 ? Math.floor((redeemSats * prevMarket.liquidityFee) / 100) : 0
 
-  const feesSinceLastChange = prevMarket.status.accLiquidityFeePool - oldEntry.globalLiqidityFeePoolSave + liquidityFee
-  const newEntryLiquidityPoints = oldEntry.liquidityPoints + feesSinceLastChange * oldEntry.balance.liquidity
+  // Calculate new global liquidity points and fees in pool
+  let newGlobalLiquidityPoints = prevMarket.status.liquidityPoints + liquiditySatFee * prevMarket.balance.liquidity
+  let newGlobalLiquidityFeePool = prevMarket.status.liquidityFeePool + liquiditySatFee
+  let newGlobalAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool + liquiditySatFee
 
-  const newAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool + liquidityFee
+  // Calculate new entry liquidity points: Contributed liquidity * new fees since last change
+  const feesSinceLastChange = newGlobalAccLiquidityFeePool - oldEntry.globalLiqidityFeePoolSave
+  let newEntryLiquidityPoints = oldEntry.liquidityPoints + feesSinceLastChange * oldEntry.balance.liquidity
+
+  // Handle redeeming of liquidity points
+  if (redeemLiquidityPoints) {
+    const redeemedLiquidityPoints = newEntryLiquidityPoints
+    newEntryLiquidityPoints = 0
+
+    // Adjust new global balances
+    if (redeemedLiquidityPoints > 0 && newGlobalLiquidityPoints > 0) {
+      const scaledLiquidityPointsShare =
+        (BigInt(redeemedLiquidityPoints) << BigInt(liquidityPointsScalingFactor)) / BigInt(newGlobalLiquidityPoints)
+      const redeemedLiquidityPoolSats = Number(
+        (BigInt(newGlobalLiquidityFeePool) * BigInt(scaledLiquidityPointsShare)) >> BigInt(liquidityPointsScalingFactor)
+      )
+
+      newGlobalLiquidityPoints = newGlobalLiquidityPoints - redeemedLiquidityPoints
+      newGlobalLiquidityFeePool = newGlobalLiquidityFeePool - redeemedLiquidityPoolSats
+    }
+  }
 
   const newEntry: entry = {
     balance: newBalance,
     publicKey,
-    globalLiqidityFeePoolSave: newAccLiquidityFeePool,
-    liquidityPoints: redeemLiquidityPoints ? 0 : newEntryLiquidityPoints
+    globalLiqidityFeePoolSave: newGlobalAccLiquidityFeePool,
+    liquidityPoints: newEntryLiquidityPoints
   }
 
   // console.log({prevShares: prevMarket.balance.shares, newShares: newGlobalBalance.shares, redeemShares, redeemSats, newAccLiquidityFeePool, newEntryLiquidityPoints})
@@ -704,15 +728,6 @@ export function getUpdateEntryTx(
 
   const merklePath = getMerklePath(prevEntries, entryIndex, version)
   const newMerklePath = getMerklePath(newEntries, entryIndex, version)
-
-  const redeemedLiquidityPoolSats = redeemLiquidityPoints
-    ? Math.floor((newEntryLiquidityPoints / prevMarket.status.liquidityPoints) * prevMarket.status.liquidityFeePool)
-    : 0
-  const newLiquidityFeePool = prevMarket.status.liquidityFeePool + liquidityFee - redeemedLiquidityPoolSats
-
-  const newLiquidityPoints = redeemLiquidityPoints
-    ? prevMarket.status.liquidityPoints + liquidityFee * prevMarket.balance.liquidity - newEntryLiquidityPoints
-    : prevMarket.status.liquidityPoints + liquidityFee * prevMarket.balance.liquidity
 
   // console.log({
   //   prevEntryBalance: oldEntry.balance,
@@ -739,14 +754,14 @@ export function getUpdateEntryTx(
     balanceMerkleRoot: getMerkleRootByPath(sha256(getEntryHex(newEntry, version)), newMerklePath),
     status: {
       ...prevMarket.status,
-      liquidityPoints: newLiquidityPoints,
-      liquidityFeePool: newLiquidityFeePool,
-      accLiquidityFeePool: newAccLiquidityFeePool
+      liquidityPoints: newGlobalLiquidityPoints,
+      liquidityFeePool: newGlobalLiquidityFeePool,
+      accLiquidityFeePool: newGlobalAccLiquidityFeePool
     }
   }
 
   const newTx = getUpdateMarketTx(prevTx, newMarket, 0, feePerByte)
-  newTx.outputs[0].satoshis = newMarketSatBalance + newLiquidityFeePool
+  newTx.outputs[0].satoshis = newMarketSatBalance + newGlobalLiquidityFeePool
 
   if (1 > newTx.outputs[0].satoshis) {
     newTx.outputs[0].satoshis = 1
@@ -1249,8 +1264,9 @@ export function fundTx(
 }
 
 export function getFunctionID(script: bsv.Script): number {
-  const asm = script.toASM().split(" ")
-  return getIntFromOP(asm[1])
+  //@ts-ignore
+  const asm = script._chunkToString(script.chunks[1], "asm").trim()
+  return getIntFromOP(asm)
 }
 
 // export function getDebugParams(tx: bsv.Transaction): string {

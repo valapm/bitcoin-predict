@@ -22,9 +22,9 @@ export type marketVersion = version & {
 
 // Keep track of old versions for compatibility.
 export const marketContracts: { [indentifier: string]: marketVersion } = {
-  "12a4fc473874e063790ed0471404a096": {
-    identifier: "12a4fc473874e063790ed0471404a096",
-    version: "0.4.1",
+  d12310e7cca312438bc227673b2c69cd: {
+    identifier: "d12310e7cca312438bc227673b2c69cd",
+    version: "0.5.0",
     argPos: 18,
     args: [
       "oracleKey",
@@ -41,8 +41,8 @@ export const marketContracts: { [indentifier: string]: marketVersion } = {
       devFee: 0.2,
       developerPayoutAddress: "0053faba2fb9a28dfa94d93270079cd2aa270180f3"
     },
-    md5: "5d52106eec34de880a39982a89318558",
-    length: 83589
+    md5: "cdf2e5fb870055f48a7c76306e77fcd7",
+    length: 83497
   },
   "73145fea9a249918adf07357674cf33d": {
     identifier: "73145fea9a249918adf07357674cf33d",
@@ -134,7 +134,7 @@ export const marketContracts: { [indentifier: string]: marketVersion } = {
   }
 }
 
-export const currentMarketContract = marketContracts["12a4fc473874e063790ed0471404a096"]
+export const currentMarketContract = marketContracts["d12310e7cca312438bc227673b2c69cd"]
 
 export const oracleContracts: { [indentifier: string]: version } = {
   "5d9a258cb212c53d9d3c5c71a0c4daeb": {

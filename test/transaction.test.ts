@@ -1400,7 +1400,7 @@ test("liquidity points redeeming", () => {
 
   expect(isValidMarketUpdateTx(tx2, tx1, newEntries)).toBe(true)
   expect(market2.status.accLiquidityFeePool).toBe(1000)
-  expect(market2.status.liquidityFeePool).toBe(700)
+  expect(market2.status.liquidityFeePool).toBe(701) // script calculations result in 1 less sat
   expect(market2.status.liquidityPoints).toBe(7000)
 })
 
