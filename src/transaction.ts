@@ -598,6 +598,7 @@ export function getUpdateEntryTx(
   feePerByte: number = feeb
 ): bsv.Transaction {
   const prevMarket = getMarketFromScript(prevTx.outputs[0].script)
+  const version = getMarketVersion(prevMarket.version)
   const optionCount = prevMarket.details.options.length
 
   const publicKey = privateKey.publicKey
@@ -607,72 +608,85 @@ export function getUpdateEntryTx(
 
   const oldEntry = prevEntries[entryIndex]
 
-  let newGlobalBalance: balance
+  const prevGlobalSatBalance = prevTx.outputs[0].satoshis
+  const prevMarketSatBalance = prevGlobalSatBalance - prevMarket.status.liquidityFeePool
+
   const updatedBalanceEntries = [...prevEntries]
   updatedBalanceEntries[entryIndex] = {
     ...oldEntry,
     balance: newBalance
   }
+
+  // Determine new contract balance
+  let redeemSats = 0
+  let newMarketSatBalance = prevMarketSatBalance
+  let newGlobalBalance: balance
+
   if (prevMarket.status.decided) {
     const decision = prevMarket.status.decision
-    const winningShares = oldEntry.balance.shares[decision]
-    const redeemed = winningShares - newBalance.shares[decision]
+    const redeemedShares = oldEntry.balance.shares[decision] - newBalance.shares[decision]
+    const liquidityChange = newBalance.liquidity - oldEntry.balance.liquidity
 
+    if (redeemedShares < 0) throw new Error("Can't add shares after market is resolved")
     if (!newBalance.shares.every((newShares, index) => index === decision || newShares === 0))
       throw new Error("Loosing shares must be set to 0")
 
-    if (redeemed !== 0) {
-      // Redeem winning shares
+    redeemSats = redeemedShares * SatScaling
+    newGlobalBalance = {
+      liquidity: prevMarket.balance.liquidity + liquidityChange,
+      shares: prevMarket.balance.shares.map((shares, index) => (index === decision ? shares - redeemedShares : shares))
+    }
 
-      newGlobalBalance = {
-        liquidity: prevMarket.balance.liquidity,
-        shares: prevMarket.balance.shares.map((shares, index) => (index === decision ? shares - redeemed : shares))
+    // Allow liquidity extraction after market is resolved
+    // Does not charge fees
+    // All money not in fee pool or in winnig shares is given to LPs
+    let extractedLiquiditySats = 0
+    if (semverGte(version.version, "0.6.0")) {
+      if (liquidityChange < 0) {
+        const prevGlobalWinningShares = prevMarket.balance.shares[prevMarket.status.decision]
+        const prevWinningSharesBalance = prevGlobalWinningShares * SatScaling
+        const prevTotalLiquiditySats =
+          prevGlobalSatBalance - prevWinningSharesBalance - prevMarket.status.liquidityFeePool
+
+        // Uses bigint for contract compatibility
+        const liquidityPercentChange = (BigInt(liquidityChange) << 32n) / BigInt(prevMarket.balance.liquidity)
+        extractedLiquiditySats = Number((liquidityPercentChange * BigInt(prevTotalLiquiditySats)) >> 32n)
       }
-    } else if (publicKey.toString() === prevMarket.creator.pubKey.toString()) {
-      // Redeem invalid shares
+    }
 
-      newGlobalBalance = getMarketBalance(updatedBalanceEntries, optionCount)
-      const onlyValidShares = newGlobalBalance.shares.map((shares, i) =>
-        i === prevMarket.status.decision ? shares : 0
-      )
-      newGlobalBalance.shares = onlyValidShares
+    if (semverLt(version.version, "0.6.0")) {
+      if (publicKey.toString() === prevMarket.creator.pubKey.toString() && redeemedShares === 0) {
+        // Redeem invalid shares
+
+        newGlobalBalance = getMarketBalance(updatedBalanceEntries, optionCount)
+        const onlyValidShares = newGlobalBalance.shares.map((shares, i) =>
+          i === prevMarket.status.decision ? shares : 0
+        )
+        newGlobalBalance.shares = onlyValidShares
+      } else if (redeemedShares === 0) {
+        newGlobalBalance = getMarketBalance(updatedBalanceEntries, optionCount)
+        newGlobalBalance.shares = prevMarket.balance.shares
+      }
+    }
+
+    if (semverLt(version.version, "0.6.0") && redeemedShares === 0) {
+      newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance, version)
+
+      const noShareChange = newGlobalBalance.shares.every((v, i) => v === prevMarket.balance.shares[i])
+      if (noShareChange && semverGte(version.version, "0.3.11")) {
+        // Do not calculate any fees if only liquidity is extracted
+        redeemSats = 0
+      } else {
+        redeemSats = prevMarketSatBalance - newMarketSatBalance
+      }
     } else {
-      newGlobalBalance = getMarketBalance(updatedBalanceEntries, optionCount)
-      newGlobalBalance.shares = prevMarket.balance.shares
+      newMarketSatBalance = prevMarketSatBalance - redeemSats - extractedLiquiditySats
     }
   } else {
+    // Market is open and user is buying, selling or changing liquidity
+
+    // FIXME: Use only entry change to calculate new balance. Check entries at some other point.
     newGlobalBalance = getMarketBalance(updatedBalanceEntries, optionCount)
-  }
-
-  const prevGlobalSatBalance = prevTx.outputs[0].satoshis
-  const prevMarketSatBalance = prevGlobalSatBalance - prevMarket.status.liquidityFeePool
-
-  // Determine payout
-  let redeemSats = 0
-
-  // Determine redeemed winning shares
-  let redeemShares = 0
-  if (prevMarket.status.decided) {
-    const decision = prevMarket.status.decision
-    const winningShares = oldEntry.balance.shares[decision]
-    redeemShares = winningShares - newBalance.shares[decision]
-  }
-
-  // Determine if redeeming invalid shares
-  // const redeemInvalid =
-  //   prevMarket.status.decided && publicKey.toString() === prevMarket.creator.pubKey.toString() && !redeemShares
-
-  const version = getMarketVersion(prevMarket.version)
-
-  let newMarketSatBalance = 0
-
-  if (redeemShares) {
-    // User is redeeming shares
-    redeemSats = redeemShares * SatScaling
-    newMarketSatBalance = prevMarketSatBalance - redeemSats
-  } else {
-    // User is buying, selling, changing liquidity or market creator is redeeming invalid shares after market is resolved
-
     newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance, version)
 
     const noShareChange = newGlobalBalance.shares.every((v, i) => v === prevMarket.balance.shares[i])
@@ -721,7 +735,7 @@ export function getUpdateEntryTx(
     liquidityPoints: newEntryLiquidityPoints
   }
 
-  // console.log({prevShares: prevMarket.balance.shares, newShares: newGlobalBalance.shares, redeemShares, redeemSats, newAccLiquidityFeePool, newEntryLiquidityPoints})
+  // console.log({prevShares: prevMarket.balance.shares, newShares: newGlobalBalance.shares, redeemedShares, redeemSats, newAccLiquidityFeePool, newEntryLiquidityPoints})
 
   const newEntries = [...prevEntries]
   newEntries[entryIndex] = newEntry
