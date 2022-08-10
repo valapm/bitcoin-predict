@@ -628,6 +628,7 @@ export function getUpdateEntryTx(
     const liquidityChange = newBalance.liquidity - oldEntry.balance.liquidity
 
     if (redeemedShares < 0) throw new Error("Can't add shares after market is resolved")
+    if (liquidityChange > 0) throw new Error("Can't add liquidity after market is resolved")
     if (!newBalance.shares.every((newShares, index) => index === decision || newShares === 0))
       throw new Error("Loosing shares must be set to 0")
 
@@ -650,7 +651,7 @@ export function getUpdateEntryTx(
 
         // Uses bigint for contract compatibility
         const liquidityPercentChange = (BigInt(liquidityChange) << 32n) / BigInt(prevMarket.balance.liquidity)
-        extractedLiquiditySats = Number((liquidityPercentChange * BigInt(prevTotalLiquiditySats)) >> 32n)
+        extractedLiquiditySats = -Number((liquidityPercentChange * BigInt(prevTotalLiquiditySats)) >> 32n)
       }
     }
 

@@ -35,7 +35,7 @@ import {
   market2JSON,
   getMarketVersion
 } from "../src/pm"
-import { balance } from "../src/lmsr"
+import { balance, SatScaling } from "../src/lmsr"
 import bsv from "bsv"
 import { getSignature, oracleDetail } from "../src/oracle"
 import { cloneDeep } from "lodash"
@@ -1005,7 +1005,9 @@ test("redeem winning shares", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
-test("redeem invalid shares", () => {
+test("redeem invalid shares (deprecated)", () => {
+  // This is deprecated. Just check that nothing changes.
+
   const entry = {
     publicKey: privateKey.publicKey,
     balance: {
@@ -1057,9 +1059,10 @@ test("redeem invalid shares", () => {
   const newEntries = [newEntry]
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+  expect(newTx.outputs[0].satoshis).toBe(tx.outputs[0].satoshis)
 })
 
-test("sell liquidity after market is resolved", () => {
+test("sell all liquidity after market is resolved", () => {
   const entry = {
     publicKey: privateKey.publicKey,
     balance: {
@@ -1116,6 +1119,69 @@ test("sell liquidity after market is resolved", () => {
   const newEntries = [newEntry]
 
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+  expect(newTx.outputs[0].satoshis).toBe(2 * SatScaling + newMarket.status.liquidityFeePool)
+})
+
+test("sell partial liquidity after market is resolved", () => {
+  const entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [1, 0, 2]
+    },
+    globalLiqidityFeePoolSave: 0,
+    liquidityPoints: 0
+  }
+
+  const localMarketCreator = cloneDeep(marketCreator)
+  localMarketCreator.pubKey = bsv.PrivateKey.fromString(
+    "L3KWX37j9v89ZUyguBGTU2WVa3xSB7f9n2ATg1jybcUpZWujRNKm"
+  ).publicKey
+
+  const resolvedMarket = getNewMarket(
+    marketDetails,
+    oracleDetails,
+    localMarketCreator,
+    creatorFee,
+    liquidityFee,
+    requiredVotes
+  )
+  resolvedMarket.status.decided = true
+  resolvedMarket.status.decision = 2
+  resolvedMarket.balance = entry.balance
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
+
+  const tx = buildNewMarketTx(resolvedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 1,
+    shares: [0, 0, 2]
+  }
+
+  const newTx = getUpdateEntryTx(
+    tx,
+    [entry],
+    newBalance,
+    false,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey
+  )
+
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
+
+  const newEntries = [newEntry]
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+  const prevMarketSatBalance = 2 * SatScaling + newMarket.status.liquidityFeePool
+  const satDiff = tx.outputs[0].satoshis - prevMarketSatBalance
+  expect(newTx.outputs[0].satoshis).toBe(2 * SatScaling + newMarket.status.liquidityFeePool + satDiff / 2)
 })
 
 test("Market creator can sell liquidity after market is resolved", () => {
