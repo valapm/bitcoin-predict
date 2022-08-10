@@ -3,11 +3,12 @@ import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
 import { int2Hex, toHex, fromHex, hex2IntArray, splitHexByNumber, reverseHex, hex2Int } from "./hex"
 import { isHash, hash, sha256 } from "./sha"
 import { oracleDetail, getOracleDetailsHex, isValidOracleDetails, getOracleStatesHex } from "./oracle"
-import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
+import { getLmsrSatsFixed, SatScaling, balance, getLmsrSats } from "./lmsr"
 import { AbstractContract } from "scryptlib/dist/contract"
 import { FunctionCall } from "scryptlib/dist/abi"
 import { currentMarketContract, marketContracts, marketVersion } from "./contracts"
 import semverLt from "semver/functions/lt"
+import semverGte from "semver/functions/gte"
 
 const valaIndexContract = "2af7dfaa7e799e28c7c31fc303dc915c"
 
@@ -502,4 +503,31 @@ export function getSettingsFromScript(inputScript: bsv.Script): any {
   }
 
   return settings
+}
+
+/**
+ * Returns number of satoshis that can be extracted when redeeming liquidity
+ */
+export function getLiquiditySatBalance(
+  marketBalance: balance,
+  marketStatus: marketStatus,
+  contractSats: number,
+  liquidity: number,
+  marketVersion: marketVersion
+) {
+  if (marketStatus.decided && semverGte(marketVersion.version, "0.6.0")) {
+    const winningShares = marketBalance.shares[marketStatus.decision]
+    const marketSatBalance = winningShares * SatScaling + marketStatus.liquidityFeePool
+    const liquiditySatBalance = contractSats - marketSatBalance
+    const liquidityShare = liquidity / marketBalance.liquidity // contract uses 32bit unint
+    return liquidityShare * liquiditySatBalance
+  } else {
+    return (
+      getLmsrSats(marketBalance) -
+      getLmsrSats({
+        shares: marketBalance.shares,
+        liquidity: marketBalance.liquidity - liquidity
+      })
+    )
+  }
 }
