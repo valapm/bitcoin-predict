@@ -1351,6 +1351,117 @@ test("Redeem winning shares after loosing shares", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
+test("Redeem liquidity before redeeming winning shares", () => {
+  const entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [0, 1, 0]
+    },
+    globalLiqidityFeePoolSave: 0,
+    liquidityPoints: 0
+  }
+
+  const resolvedMarket = getNewMarket(
+    marketDetails,
+    oracleDetails,
+    marketCreator,
+    creatorFee,
+    liquidityFee,
+    requiredVotes
+  )
+  resolvedMarket.status.decided = true
+  resolvedMarket.status.decision = 1
+  resolvedMarket.balance = entry.balance
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
+
+  const tx = buildNewMarketTx(resolvedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 0,
+    shares: [0, 1, 0]
+  }
+
+  const newTx = getUpdateEntryTx(
+    tx,
+    [entry],
+    newBalance,
+    false,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey
+  )
+
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
+
+  const newEntries = [newEntry]
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+test("Redeem liquidity while global winning shares are not 0", () => {
+  const entry = {
+    publicKey: privateKey.publicKey,
+    balance: {
+      liquidity: 2,
+      shares: [0, 0, 0]
+    },
+    globalLiqidityFeePoolSave: 0,
+    liquidityPoints: 0
+  }
+
+  const resolvedMarket = getNewMarket(
+    marketDetails,
+    oracleDetails,
+    marketCreator,
+    creatorFee,
+    liquidityFee,
+    requiredVotes
+  )
+  resolvedMarket.status.decided = true
+  resolvedMarket.status.decision = 1
+  resolvedMarket.balance = {
+    liquidity: 2,
+    shares: [0, 1, 0]
+  }
+  resolvedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
+
+  const tx = buildNewMarketTx(resolvedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 0,
+    shares: [0, 0, 0]
+  }
+
+  const newTx = getUpdateEntryTx(
+    tx,
+    [entry],
+    newBalance,
+    false,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey
+  )
+
+  const newMarket = getMarketFromScript(newTx.outputs[0].script)
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
+  newEntry.globalLiqidityFeePoolSave = newMarket.status.accLiquidityFeePool
+  newEntry.liquidityPoints = newMarket.status.liquidityPoints
+
+  const newEntries = [newEntry]
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
 test("liquidity points generation", () => {
   const entry1: entry = {
     publicKey: privateKey.publicKey,

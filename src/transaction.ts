@@ -504,7 +504,8 @@ export function getAddEntryTx(
   //     0n,
   //     0,
   //     0,
-  //     newTx.outputs[0].satoshis
+  //     newTx.outputs[0].satoshis,
+  //    new Bytes("").toLiteral()
   //   )
   //   .toScript()
 
@@ -569,7 +570,8 @@ export function getAddEntryTx(
   //   0n,
   //   0,
   //   0,
-  //   newTx.outputs[0].satoshis
+  //   newTx.outputs[0].satoshis,
+  //    new Bytes("").toLiteral()
   // ])
 
   // console.log("new", unlockingScript.toASM().split(" ").slice(1))
@@ -577,7 +579,7 @@ export function getAddEntryTx(
 
   newTx.inputs[0].setScript(unlockingScript)
 
-  // console.log(newTx.toString())
+  // console.log(newTx.serialize())
   // console.log(prevTx.outputs[outputIndex].satoshis)
 
   // const asm = prevTx.outputs[outputIndex].script.toASM().split(" ")
@@ -855,7 +857,8 @@ export function getUpdateEntryTx(
   //     0n,
   //     0,
   //     0,
-  //     newTx.outputs[0].satoshis
+  //     newTx.outputs[0].satoshis,
+  //    new Bytes("").toLiteral()
   //   )
   // .toScript()
 
@@ -915,11 +918,12 @@ export function getUpdateEntryTx(
   //   0n,
   //   0,
   //   0,
-  //   newTx.outputs[0].satoshis
+  //   newTx.outputs[0].satoshis,
+  //   new Bytes("00").toLiteral()
   // ])
 
   // console.log(newTx.outputs[0].script.toHex())
-  // console.log("changeSats", changeSats,newTx.outputs[3].satoshis)
+  // console.log("changeSats", changeSats, newTx.outputs[3].satoshis)
   // console.log([
   //   newTx.outputs[1].script.toHex(), // dev
   //   version.options.developerPayoutAddress,
@@ -931,7 +935,7 @@ export function getUpdateEntryTx(
 
   newTx.inputs[0].setScript(unlockingScript)
 
-  // console.log(newTx.toString())
+  // console.log(newTx.serialize())
   // console.log(prevTx.outputs[0].satoshis)
 
   // const asm = prevTx.outputs[0].script.toASM().split(" ")
@@ -1007,7 +1011,8 @@ export function getOracleCommitTx(
   //     signature.signature,
   //     signature.paddingByteCount,
   //     0,
-  //     newTx.outputs[0].satoshis
+  //     newTx.outputs[0].satoshis,
+  //    new Bytes("").toLiteral()
   //   )
   //   .toScript()
 
@@ -1061,14 +1066,15 @@ export function getOracleCommitTx(
   //   oracleIndex,
   //   signature.signature.toString(),
   //   signature.paddingByteCount,
-  //   0
+  //   0,
+  //    new Bytes("").toLiteral()
   // ])
 
   newTx.inputs[0].setScript(unlockingScript)
 
   fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
 
-  // console.log(newTx.toString())
+  // console.log(newTx.serialize())
   // console.log(prevTx.outputs[0].satoshis)
 
   // const asm = prevTx.outputs[0].script.toASM().split(" ")
@@ -1159,7 +1165,8 @@ export function getOracleVoteTx(
   //     signature.signature,
   //     signature.paddingByteCount,
   //     vote,
-  //     newTx.outputs[0].satoshis
+  //     newTx.outputs[0].satoshis,
+  //    new Bytes("").toLiteral()
   //   )
   //   .toScript()
 
@@ -1213,14 +1220,16 @@ export function getOracleVoteTx(
   //   oracleIndex,
   //   signature.signature.toString(),
   //   signature.paddingByteCount,
-  //   vote
+  //   vote,
+  //    0,
+  //    new Bytes("").toLiteral()
   // ])
 
   newTx.inputs[0].setScript(unlockingScript)
 
   fundTx(newTx, spendingPrivKey, payoutAddress, utxos, feePerByte)
 
-  // console.log(newTx.toString())
+  // console.log(newTx.serialize())
   // console.log(prevTx.outputs[0].satoshis)
 
   // const asm = prevTx.outputs[0].script.toASM().split(" ")
@@ -1390,7 +1399,7 @@ export function getNewOracleTx(
 
   // console.log(tx.inputs)
   // console.log(tx.outputs)
-  // console.log(tx.toString())
+  // console.log(tx.serialize())
 
   return tx
 }
@@ -1503,7 +1512,7 @@ export function getOracleUpdateTx(
   const unlockingScript = bsv.Script.fromASM(unlockingScriptASM)
   newTx.inputs[0].setScript(unlockingScript)
 
-  // console.log(newTx.toString())
+  // console.log(newTx.serialize())
   // console.log(prevTx.outputs[outputIndex].satoshis)
 
   // const asm = prevTx.outputs[outputIndex].script.toASM().split(" ")
@@ -1613,7 +1622,7 @@ export function getUpdateMarketSettingsTx(
   //   new Bytes(settingsHex).toLiteral()
   // ])
 
-  // console.log(newTx.toString())
+  // console.log(newTx.serialize())
   // console.log(prevTx.outputs[outputIndex].satoshis)
 
   // const asm = prevTx.outputs[outputIndex].script.toASM().split(" ")
