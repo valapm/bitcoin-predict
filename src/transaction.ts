@@ -787,15 +787,23 @@ export function getUpdateEntryTx(
   // Add fee outputs to dev and creator
   if (redeemSats > 0) {
     let developerSatFee = Math.floor((version.options.devFee * redeemSats) / 100)
-    let creatorSatFee = Math.floor((prevMarket.creatorFee * redeemSats) / 100)
 
-    developerSatFee = developerSatFee > DUST ? developerSatFee : DUST
-    creatorSatFee = creatorSatFee > DUST ? creatorSatFee : DUST
+    if (developerSatFee < DUST && semverLt(version.version, "0.6.2")) {
+      developerSatFee = DUST
+    }
 
     newTx.to(bsv.Address.fromHex(version.options.developerPayoutAddress), developerSatFee)
-    newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
 
-    // console.log({developerSatFee, creatorSatFee})
+    if (prevMarket.creatorFee > 0 || semverLt(version.version, "0.6.2")) {
+      let creatorSatFee = Math.floor((prevMarket.creatorFee * redeemSats) / 100)
+
+      if (creatorSatFee < DUST && semverLt(version.version, "0.6.2")) {
+        creatorSatFee = DUST
+      }
+
+      newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
+    }
+
     // console.log(newTx.outputs[1].script.toHex(), newTx.outputs[2].script.toHex())
   }
 

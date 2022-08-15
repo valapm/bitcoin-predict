@@ -502,6 +502,76 @@ test("update entry (sell)", () => {
   expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
 })
 
+test("update entry (sell) with no liquidity fee", () => {
+  const populatedMarket = getNewMarket(marketDetails, oracleDetails, marketCreator, creatorFee, 0, requiredVotes)
+  populatedMarket.balance = entry.balance
+  populatedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
+
+  const tx = buildNewMarketTx(populatedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 2,
+    shares: [0, 0, 0]
+  }
+
+  const newTx = getUpdateEntryTx(
+    tx,
+    entries,
+    newBalance,
+    false,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey
+  )
+
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
+
+  const newEntries = [newEntry]
+
+  // console.log(getDebugParams(newTx))
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
+test("update entry (sell) with no market fee", () => {
+  const populatedMarket = getNewMarket(marketDetails, oracleDetails, marketCreator, 0, liquidityFee, requiredVotes)
+  populatedMarket.balance = entry.balance
+  populatedMarket.balanceMerkleRoot = getBalanceMerkleRoot([entry], version)
+
+  const tx = buildNewMarketTx(populatedMarket)
+  fundTx(tx, privateKey, address, utxos)
+
+  const newBalance: balance = {
+    liquidity: 2,
+    shares: [0, 0, 0]
+  }
+
+  const newTx = getUpdateEntryTx(
+    tx,
+    entries,
+    newBalance,
+    false,
+    privateKey,
+    marketCreator.payoutAddress,
+    utxos,
+    privateKey
+  )
+
+  const newEntry: entry = cloneDeep(entries[0])
+  newEntry.balance = newBalance
+  newEntry.liquidityPoints = 1642
+  newEntry.globalLiqidityFeePoolSave = 821
+
+  const newEntries = [newEntry]
+
+  // console.log(getDebugParams(newTx))
+
+  expect(isValidMarketUpdateTx(newTx, tx, newEntries)).toBe(true)
+})
+
 test("add a lots of liquidty", () => {
   const tx = buildNewMarketTx(populatedMarket)
   fundTx(tx, privateKey, address, utxos)
