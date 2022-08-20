@@ -7,12 +7,12 @@
   "browser": "./dist/bitcoin-predict.js",
   "scripts": {
     "build": "npm run build:web && npm run build:node",
-    "build:web": "export NODE_OPTIONS=--openssl-legacy-provider; webpack --config webpack.config.js",
-    "build:node": "export NODE_OPTIONS=--openssl-legacy-provider; tsc && cp src/types/* lib",
+    "build:web": "webpack --config webpack.config.js",
+    "build:node": "tsc && cp src/types/* lib",
     "prepare": "npm run build",
     "format": "prettier --write \"src/**/*.ts\" \"src/**/*.js\"",
     "lint": "eslint src --ext .ts",
-    "test": "export NODE_OPTIONS=--openssl-legacy-provider; jest"
+    "test": "jest"
   },
   "author": "Merlin Buczek",
   "devDependencies": {
