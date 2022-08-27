@@ -263,9 +263,18 @@ function getOpReturnPos(script: bsv.Script): number {
   throw new Error("No OP_RETURN found")
 }
 
-export function getMarketFromScript(script: bsv.Script): marketInfo {
+export function getOracleRabinKeyFromScript(script: bsv.Script): BigInt {
   const opReturnIndex = getOpReturnPos(script)
   const asm = script.toASM().split(" ")
+  const chunks = script.chunks.slice(opReturnIndex + 1)
+  const opReturnData = new bsv.Script({ chunks }).toASM().split(" ")
+  const version = getOracleVersion(opReturnData[0])
+  return hex2BigInt(asm[version.argPos])
+}
+
+export function getMarketFromScript(script: bsv.Script): marketInfo {
+  const opReturnIndex = getOpReturnPos(script)
+  const asm = script.toASM().split(" ") // TODO: Optimize, remove
   const chunks = script.chunks.slice(opReturnIndex + 1)
   const opReturnData = new bsv.Script({ chunks }).toASM().split(" ")
 
