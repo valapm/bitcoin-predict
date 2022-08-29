@@ -1,6 +1,6 @@
 {
   "name": "bitcoin-predict",
-  "version": "0.16.5",
+  "version": "0.16.6",
   "description": "",
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
