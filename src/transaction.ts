@@ -268,8 +268,15 @@ export function getOracleRabinKeyFromScript(script: bsv.Script): BigInt {
   const asm = script.toASM().split(" ")
   const chunks = script.chunks.slice(opReturnIndex + 1)
   const opReturnData = new bsv.Script({ chunks }).toASM().split(" ")
-  const version = getOracleVersion(opReturnData[0])
-  return hex2BigInt(asm[version.argPos])
+  let argPos
+  try {
+    const version = getOracleVersion(opReturnData[0])
+    argPos = version.argPos
+  } catch {
+    // Older versions without id
+    argPos = 3
+  }
+  return hex2BigInt(asm[argPos])
 }
 
 export function getMarketFromScript(script: bsv.Script): marketInfo {
