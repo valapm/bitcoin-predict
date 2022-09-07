@@ -669,7 +669,7 @@ export function getUpdateEntryTx(
 
         // Uses bigint for contract compatibility
         const liquidityPercentChange = (BigInt(liquidityChange) << 32n) / BigInt(prevMarket.balance.liquidity)
-        extractedLiquiditySats = -Number((liquidityPercentChange * BigInt(prevTotalLiquiditySats)) >> 32n)
+        extractedLiquiditySats = Number(-(liquidityPercentChange * BigInt(prevTotalLiquiditySats)) >> 32n)
       }
     }
 
