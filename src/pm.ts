@@ -516,6 +516,8 @@ export function getLiquiditySatBalance(
   marketVersion: marketVersion
 ) {
   if (marketStatus.decided && semverGte(marketVersion.version, "0.6.0")) {
+    if (marketBalance.liquidity === 0) return 0
+
     const winningShares = marketBalance.shares[marketStatus.decision]
     const marketSatBalance = winningShares * SatScaling + marketStatus.liquidityFeePool
     const liquiditySatBalance = contractSats - marketSatBalance
