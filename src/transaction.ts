@@ -470,15 +470,68 @@ export function getAddEntryTx(
   const newEntries = prevEntries.concat([entry])
   const newGlobalBalance = getMarketBalance(newEntries, optionCount)
 
+  let newGlobalLiquidityFeePool = prevMarket.status.liquidityFeePool
+  let newGlobalAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool
+
+  let redeemSats = 0
+  if (semverGte(version.version, "0.6.3")) {
+    const prevGlobalSatBalance = prevTx.outputs[outputIndex].satoshis
+    const prevMarketSatBalance = prevGlobalSatBalance - prevMarket.status.liquidityFeePool
+    const newMarketSatBalance = getLmsrSatsFixed(newGlobalBalance, version)
+
+    const noShareChange = newGlobalBalance.shares.every((v, i) => v === prevMarket.balance.shares[i])
+    if (noShareChange) {
+      // Do not calculate any fees if only liquidity is extracted
+      redeemSats = 0
+    } else {
+      redeemSats = prevMarketSatBalance - newMarketSatBalance
+    }
+
+    redeemSats = Math.abs(redeemSats)
+
+    // Calculate liquidity fee
+    const liquiditySatFee = redeemSats > 0 ? Math.floor((redeemSats * prevMarket.liquidityFee) / 100) : 0
+
+    // Calculate new global liquidity points and fees in pool
+    newGlobalLiquidityFeePool = prevMarket.status.liquidityFeePool + liquiditySatFee
+    newGlobalAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool + liquiditySatFee
+
+    entry.globalLiqidityFeePoolSave = newGlobalAccLiquidityFeePool
+  }
+
   const newMarket: marketInfo = {
     ...prevMarket,
     balance: newGlobalBalance,
-    balanceMerkleRoot: getMerkleRoot(newEntries, version)
+    balanceMerkleRoot: getMerkleRoot(newEntries, version),
+    status: {
+      ...prevMarket.status,
+      accLiquidityFeePool: newGlobalAccLiquidityFeePool,
+      liquidityFeePool: newGlobalLiquidityFeePool
+    }
   }
 
   // console.log(addLeaf(sha256(lastEntry), lastMerklePath, prevMarket.balanceMerkleRoot, sha256(getEntryHex(entry))), getMerkleRoot(newEntries))
 
   const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex, feePerByte)
+
+  if (semverGte(version.version, "0.6.3")) {
+    // Fees need to be payed when buying as well
+
+    // Add fee outputs to dev and creator
+    if (redeemSats > 0) {
+      let developerSatFee = Math.floor((version.options.devFee * redeemSats) / 100)
+
+      newTx.to(bsv.Address.fromHex(version.options.developerPayoutAddress), developerSatFee)
+
+      if (prevMarket.creatorFee > 0 || semverLt(version.version, "0.6.2")) {
+        let creatorSatFee = Math.floor((prevMarket.creatorFee * redeemSats) / 100)
+
+        newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
+      }
+
+      // console.log(newTx.outputs[1].script.toHex(), newTx.outputs[2].script.toHex())
+    }
+  }
 
   const txSize = newTx._estimateSize()
   const sizeEstimate = txSize * 2 + 200 // Tx will get bigger when sighash is added
@@ -587,7 +640,7 @@ export function getAddEntryTx(
   //   0,
   //   0,
   //   newTx.outputs[0].satoshis,
-  //    new Bytes("").toLiteral()
+  //   new Bytes("").toLiteral()
   // ])
 
   // console.log("new", unlockingScript.toASM().split(" ").slice(1))
@@ -596,6 +649,7 @@ export function getAddEntryTx(
   newTx.inputs[0].setScript(unlockingScript)
 
   // console.log(newTx.serialize())
+  // console.log(outputIndex)
   // console.log(prevTx.outputs[outputIndex].satoshis)
 
   // const asm = prevTx.outputs[outputIndex].script.toASM().split(" ")
@@ -716,6 +770,8 @@ export function getUpdateEntryTx(
       redeemSats = prevMarketSatBalance - newMarketSatBalance
     }
   }
+
+  if (semverGte(version.version, "0.6.3")) redeemSats = Math.abs(redeemSats)
 
   // Calculate liquidity fee
   const liquiditySatFee = redeemSats > 0 ? Math.floor((redeemSats * prevMarket.liquidityFee) / 100) : 0
