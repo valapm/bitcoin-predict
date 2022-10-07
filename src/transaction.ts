@@ -377,6 +377,9 @@ export function isValidUpdateTx(
   outputIndex = 0,
   inputIndex = 0
 ): boolean {
+  // FIXME: The interpreter creates side effects and can influence future interpreter runs!
+  // const txCopy = new bsv.Transaction(tx.serialize())
+
   const lockingScript = prevTx.outputs[outputIndex].script
   const unlockingScript = tx.inputs[inputIndex].script
   const interpreter = bsv.Script.Interpreter()
@@ -470,6 +473,7 @@ export function getAddEntryTx(
   const newEntries = prevEntries.concat([entry])
   const newGlobalBalance = getMarketBalance(newEntries, optionCount)
 
+  let newGlobalLiquidityPoints = prevMarket.status.liquidityPoints
   let newGlobalLiquidityFeePool = prevMarket.status.liquidityFeePool
   let newGlobalAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool
 
@@ -493,6 +497,7 @@ export function getAddEntryTx(
     const liquiditySatFee = redeemSats > 0 ? Math.floor((redeemSats * prevMarket.liquidityFee) / 100) : 0
 
     // Calculate new global liquidity points and fees in pool
+    newGlobalLiquidityPoints = prevMarket.status.liquidityPoints + liquiditySatFee * prevMarket.balance.liquidity
     newGlobalLiquidityFeePool = prevMarket.status.liquidityFeePool + liquiditySatFee
     newGlobalAccLiquidityFeePool = prevMarket.status.accLiquidityFeePool + liquiditySatFee
 
@@ -505,6 +510,7 @@ export function getAddEntryTx(
     balanceMerkleRoot: getMerkleRoot(newEntries, version),
     status: {
       ...prevMarket.status,
+      liquidityPoints: newGlobalLiquidityPoints,
       accLiquidityFeePool: newGlobalAccLiquidityFeePool,
       liquidityFeePool: newGlobalLiquidityFeePool
     }
@@ -527,6 +533,12 @@ export function getAddEntryTx(
         let creatorSatFee = Math.floor((prevMarket.creatorFee * redeemSats) / 100)
 
         newTx.to(prevMarket.creator.payoutAddress, creatorSatFee)
+
+        // console.log({
+        //   redeemSats,
+        //   developerSatFee,
+        //   creatorSatFee
+        // })
       }
 
       // console.log(newTx.outputs[1].script.toHex(), newTx.outputs[2].script.toHex())
@@ -574,7 +586,7 @@ export function getAddEntryTx(
   //     0,
   //     0,
   //     newTx.outputs[0].satoshis,
-  //    new Bytes("").toLiteral()
+  //     new Bytes("").toLiteral()
   //   )
   //   .toScript()
 

@@ -56,7 +56,7 @@
     "node-fetch": "^3.2.3",
     "process": "^0.11.10",
     "rabinsig": "github:sCrypt-Inc/rabin#4a25e31f8289b6cfd4808564e27c0f51730324a9",
-    "semver": "^7.3.7",
-    "scryptlib": "github:valapm/scryptlib#cb9299949a0371aeb2fbcd363d9af8dbc3117e72"
+    "scryptlib": "github:valapm/scryptlib#cb9299949a0371aeb2fbcd363d9af8dbc3117e72",
+    "semver": "^7.3.7"
   }
 }

@@ -440,8 +440,8 @@ export function validateEntries(market: marketInfo, entries: entry[]): boolean {
     ? true
     : market.balance.shares.every((n, i) => n === calculatedBalance.shares[i])
 
-  // console.log({entries: JSON.stringify(entries.map(e => e.balance))})
-  // const hasCorrectBalanceMerkleRoot = market.balanceMerkleRoot === getBalanceMerkleRoot(entries, version)
+  // console.log({ entries: JSON.stringify(entries.map(e => e.balance)) })
+  const hasCorrectBalanceMerkleRoot = market.balanceMerkleRoot === getBalanceMerkleRoot(entries, version)
 
   // console.log({
   //   hasCorrectLiquidity,
@@ -449,7 +449,7 @@ export function validateEntries(market: marketInfo, entries: entry[]): boolean {
   //   hasCorrectBalanceMerkleRoot
   // })
 
-  return hasCorrectLiquidity && hasCorrectShares // && hasCorrectBalanceMerkleRoot
+  return hasCorrectLiquidity && hasCorrectShares && hasCorrectBalanceMerkleRoot
 }
 
 export function getMinMarketSatBalance(market: marketInfo, entries: entry[]): number {
