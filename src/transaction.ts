@@ -45,7 +45,7 @@ import {
 } from "./oracle"
 import { getLmsrSatsFixed, SatScaling, balance } from "./lmsr"
 import { getMerkleRootByPath, addLeaf, verifyLeaf } from "./merkleTree"
-import { sha256 } from "./sha"
+import { sha256, sha256d } from "./sha"
 import { DEFAULT_FLAGS } from "scryptlib/dist/utils"
 import { rabinPrivKey, RabinSignature, rabinPubKey } from "rabinsig"
 import { hex2IntArray, int2Hex, getIntFromOP, reverseHex, hex2BigInt, hex2Int, toHex } from "./hex"
@@ -516,8 +516,6 @@ export function getAddEntryTx(
     }
   }
 
-  // console.log(addLeaf(sha256(lastEntry), lastMerklePath, prevMarket.balanceMerkleRoot, sha256(getEntryHex(entry))), getMerkleRoot(newEntries))
-
   const newTx = getUpdateMarketTx(prevTx, newMarket, outputIndex, feePerByte)
 
   if (semverGte(version.version, "0.6.3")) {
@@ -589,11 +587,6 @@ export function getAddEntryTx(
   //     new Bytes("").toLiteral()
   //   )
   //   .toScript()
-
-  // if (!verifyLeaf(sha256(lastEntry), lastMerklePath, prevMarket.balanceMerkleRoot)) {
-  //   console.log(sha256(lastEntry), lastMerklePath, prevMarket.balanceMerkleRoot)
-  //   console.log(prevEntries.map(entry => sha256(getEntryHex(entry))))
-  // }
 
   const unlockArgs = [
     preimage.toString("hex"),
@@ -849,10 +842,12 @@ export function getUpdateEntryTx(
   //   newMarketSatBalance
   // })
 
+  const sha = semverLt(version.version, "0.6.5") ? sha256 : sha256d
+
   const newMarket: marketInfo = {
     ...prevMarket,
     balance: newGlobalBalance,
-    balanceMerkleRoot: getMerkleRootByPath(sha256(getEntryHex(newEntry, version)), newMerklePath),
+    balanceMerkleRoot: getMerkleRootByPath(sha(getEntryHex(newEntry, version)), newMerklePath),
     status: {
       ...prevMarket.status,
       liquidityPoints: newGlobalLiquidityPoints,

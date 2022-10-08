@@ -1,7 +1,7 @@
 import { bsv, buildContractClass, SigHashPreimage, PubKey, Bytes, Sig, Ripemd160 } from "scryptlib"
 import { getMerkleRoot, getMerklePath as getShaMerklePath } from "./merkleTree"
 import { int2Hex, toHex, fromHex, hex2IntArray, splitHexByNumber, reverseHex, hex2Int } from "./hex"
-import { isHash, hash, sha256 } from "./sha"
+import { isHash, hash, sha256, sha256d } from "./sha"
 import { oracleDetail, getOracleDetailsHex, isValidOracleDetails, getOracleStatesHex } from "./oracle"
 import { getLmsrSatsFixed, SatScaling, balance, getLmsrSats } from "./lmsr"
 import { AbstractContract } from "scryptlib/dist/contract"
@@ -138,7 +138,8 @@ export function getNewMarket(
   creator: creatorInfo,
   creatorFee: number,
   liquidityFee: number,
-  requiredVotes: number
+  requiredVotes: number,
+  version = currentMarketContract
 ): marketInfo {
   const votes = "0"
     .repeat(details.options.length)
@@ -146,6 +147,8 @@ export function getNewMarket(
     .map(n => parseInt(n))
 
   const status = { decided: false, decision: 0, votes, liquidityFeePool: 0, accLiquidityFeePool: 0, liquidityPoints: 0 }
+
+  const firstEntryHash = semverLt(version.version, "0.6.5") ? sha256("00") : sha256d("00")
 
   return {
     version: currentMarketContract.identifier,
@@ -156,7 +159,7 @@ export function getNewMarket(
       liquidity: 0,
       shares: new Array(details.options.length).fill(0) as number[]
     },
-    balanceMerkleRoot: getMerkleRoot([sha256("00")]),
+    balanceMerkleRoot: getMerkleRoot([firstEntryHash]),
     creator,
     creatorFee,
     liquidityFee,
@@ -328,11 +331,15 @@ export function getMarketBalance(entries: entry[], optionCount: number): balance
 }
 
 export function getBalanceMerkleRoot(entries: entry[], version: marketVersion): hash {
-  return getMerkleRoot([sha256("00"), ...entries.map(entry => sha256(getEntryHex(entry, version)))])
+  const sha = semverLt(version.version, "0.6.5") ? sha256 : sha256d
+
+  return getMerkleRoot([sha("00"), ...entries.map(entry => sha(getEntryHex(entry, version)))])
 }
 
 export function getMerklePath(entries: entry[], position: number, version: marketVersion): string {
-  return getShaMerklePath(position + 1, [sha256("00"), ...entries.map(entry => sha256(getEntryHex(entry, version)))])
+  const sha = semverLt(version.version, "0.6.5") ? sha256 : sha256d
+
+  return getShaMerklePath(position + 1, [sha("00"), ...entries.map(entry => sha(getEntryHex(entry, version)))])
 }
 
 export function getMarketBalanceHex(entries: entry[], optionCount: number, version: marketVersion): string {
@@ -469,13 +476,16 @@ export function getMinMarketSatBalance(market: marketInfo, entries: entry[]): nu
 }
 
 export function isValidMarketInit(market: marketInfo): boolean {
+  const version = getMarketVersion(market.version)
+  const firstEntryHash = semverLt(version.version, "0.6.5") ? sha256("00") : sha256d("00")
+
   return (
     !market.status.decided &&
     market.status.votes.reduce((a, b) => a + b, 0) === 0 &&
     market.oracles.every(oracle => !oracle.committed && !oracle.voted) &&
     market.balance.liquidity === 0 &&
     market.balance.shares.reduce((a, b) => a + b, 0) === 0 &&
-    market.balanceMerkleRoot === getMerkleRoot([sha256("00")])
+    market.balanceMerkleRoot === getMerkleRoot([firstEntryHash])
   )
 }
 

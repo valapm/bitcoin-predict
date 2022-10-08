@@ -1,55 +1,62 @@
 import { update } from "lodash"
 import { addLeaf, verifyLeaf, getMerkleRoot, getMerklePath, getMerkleRootByPath, updateLeaf } from "../src/merkleTree"
-import { sha256 } from "../src/sha"
+import { sha256d } from "../src/sha"
 import { marketContracts } from "../src/contracts"
 import { getMerklePath as getMerklePathEntries, getEntryHex, entry } from "../src/pm"
 import bsv from "bsv"
 
 test("Add leafs", () => {
-  const hashes = [sha256("01"), sha256("02"), sha256("03"), sha256("04")]
+  const hashes = [sha256d("01"), sha256d("02"), sha256d("03"), sha256d("04")]
 
   const root = getMerkleRoot(hashes)
   const lastPath = getMerklePath(3, hashes)
 
-  expect(verifyLeaf(sha256("04"), lastPath, root)).toBe(true)
+  expect(verifyLeaf(sha256d("04"), lastPath, root)).toBe(true)
 
-  const root2 = addLeaf(sha256("04"), lastPath, root, sha256("05"))
+  const root2 = addLeaf("04", lastPath, root, "05")
 
-  const hashes2 = hashes.concat([sha256("05")])
+  const hashes2 = hashes.concat([sha256d("05")])
   const lastPath2 = getMerklePath(4, hashes2)
 
-  expect(verifyLeaf(sha256("05"), lastPath2, root2)).toBe(true)
+  expect(verifyLeaf(sha256d("05"), lastPath2, root2)).toBe(true)
 
-  const rootTest = getMerkleRoot([sha256("01"), sha256("02"), sha256("03"), sha256("04"), sha256("05")])
+  const rootTest = getMerkleRoot([sha256d("01"), sha256d("02"), sha256d("03"), sha256d("04"), sha256d("05")])
 
   expect(rootTest).toBe(root2)
 
-  const root3 = addLeaf(sha256("05"), lastPath2, root2, sha256("06"))
+  const root3 = addLeaf("05", lastPath2, root2, "06")
 
-  const hashes3 = hashes2.concat([sha256("06")])
+  const hashes3 = hashes2.concat([sha256d("06")])
   const lastPath3 = getMerklePath(5, hashes3)
 
-  expect(verifyLeaf(sha256("06"), lastPath3, root3)).toBe(true)
+  expect(verifyLeaf(sha256d("06"), lastPath3, root3)).toBe(true)
 
-  const rootTest2 = getMerkleRoot([sha256("01"), sha256("02"), sha256("03"), sha256("04"), sha256("05"), sha256("06")])
+  const rootTest2 = getMerkleRoot([
+    sha256d("01"),
+    sha256d("02"),
+    sha256d("03"),
+    sha256d("04"),
+    sha256d("05"),
+    sha256d("06")
+  ])
 
   expect(rootTest2).toBe(root3)
 
-  const root4 = addLeaf(sha256("06"), lastPath3, root3, sha256("07"))
+  const root4 = addLeaf("06", lastPath3, root3, "07")
 
-  const hashes4 = hashes3.concat([sha256("07")])
+  const hashes4 = hashes3.concat([sha256d("07")])
   const lastPath4 = getMerklePath(6, hashes4)
 
-  expect(verifyLeaf(sha256("07"), lastPath4, root4)).toBe(true)
+  expect(verifyLeaf(sha256d("07"), lastPath4, root4)).toBe(true)
 
   const rootTest3 = getMerkleRoot([
-    sha256("01"),
-    sha256("02"),
-    sha256("03"),
-    sha256("04"),
-    sha256("05"),
-    sha256("06"),
-    sha256("07")
+    sha256d("01"),
+    sha256d("02"),
+    sha256d("03"),
+    sha256d("04"),
+    sha256d("05"),
+    sha256d("06"),
+    sha256d("07")
   ])
 
   expect(rootTest3).toBe(root4)
@@ -57,98 +64,114 @@ test("Add leafs", () => {
 
 test("calculate valid paths", () => {
   const hashes = [
-    sha256("01"),
-    sha256("02"),
-    sha256("03"),
-    sha256("04"),
-    sha256("05"),
-    sha256("06"),
-    sha256("07"),
-    sha256("09"),
-    sha256("10"),
-    sha256("11"),
-    sha256("12"),
-    sha256("13"),
-    sha256("14"),
-    sha256("15"),
-    sha256("16"),
-    sha256("17"),
-    sha256("18"),
-    sha256("19"),
-    sha256("20")
+    sha256d("01"),
+    sha256d("02"),
+    sha256d("03"),
+    sha256d("04"),
+    sha256d("05"),
+    sha256d("06"),
+    sha256d("07"),
+    sha256d("09"),
+    sha256d("10"),
+    sha256d("11"),
+    sha256d("12"),
+    sha256d("13"),
+    sha256d("14"),
+    sha256d("15"),
+    sha256d("16"),
+    sha256d("17"),
+    sha256d("18"),
+    sha256d("19"),
+    sha256d("20")
   ]
 
   const root = getMerkleRoot(hashes)
 
   const path = getMerklePath(3, hashes)
-  expect(verifyLeaf(sha256("04"), path, root)).toBe(true)
+  expect(verifyLeaf(sha256d("04"), path, root)).toBe(true)
 
   const path2 = getMerklePath(4, hashes)
-  expect(verifyLeaf(sha256("05"), path2, root)).toBe(true)
+  expect(verifyLeaf(sha256d("05"), path2, root)).toBe(true)
 
   const path3 = getMerklePath(5, hashes)
-  expect(verifyLeaf(sha256("06"), path3, root)).toBe(true)
+  expect(verifyLeaf(sha256d("06"), path3, root)).toBe(true)
 })
 
 test("update leafs", () => {
-  const hashes = [sha256("01"), sha256("02"), sha256("03"), sha256("04"), sha256("05"), sha256("06"), sha256("07")]
+  const hashes = [
+    sha256d("01"),
+    sha256d("02"),
+    sha256d("03"),
+    sha256d("04"),
+    sha256d("05"),
+    sha256d("06"),
+    sha256d("07")
+  ]
 
   const root = getMerkleRoot(hashes)
 
-  const root2 = updateLeaf(sha256("03"), sha256("08"), getMerklePath(2, hashes), root)
-  const hashes2 = [sha256("01"), sha256("02"), sha256("08"), sha256("04"), sha256("05"), sha256("06"), sha256("07")]
+  const root2 = updateLeaf("03", "08", getMerklePath(2, hashes), root)
+  const hashes2 = [
+    sha256d("01"),
+    sha256d("02"),
+    sha256d("08"),
+    sha256d("04"),
+    sha256d("05"),
+    sha256d("06"),
+    sha256d("07")
+  ]
 
   expect(getMerkleRoot(hashes2)).toBe(root2)
 })
 
 test("update leafs", () => {
   const hashes = [
-    sha256("01"),
-    sha256("02"),
-    sha256("03"),
-    sha256("04"),
-    sha256("05"),
-    sha256("06"),
-    sha256("07"),
-    sha256("08"),
-    sha256("09"),
-    sha256("10"),
-    sha256("11"),
-    sha256("12"),
-    sha256("13"),
-    sha256("14"),
-    sha256("15"),
-    sha256("16"),
-    sha256("17"),
-    sha256("18"),
-    sha256("19"),
-    sha256("20")
+    sha256d("01"),
+    sha256d("02"),
+    sha256d("03"),
+    sha256d("04"),
+    sha256d("05"),
+    sha256d("06"),
+    sha256d("07"),
+    sha256d("08"),
+    sha256d("09"),
+    sha256d("10"),
+    sha256d("11"),
+    sha256d("12"),
+    sha256d("13"),
+    sha256d("14"),
+    sha256d("15"),
+    sha256d("16"),
+    sha256d("17"),
+    sha256d("18"),
+    sha256d("19"),
+    sha256d("20")
   ]
 
   const root = getMerkleRoot(hashes)
 
-  const root2 = updateLeaf(sha256("03"), sha256("08"), getMerklePath(2, hashes), root)
+  const root2 = updateLeaf("03", "08", getMerklePath(2, hashes), root)
   const hashes2 = [
-    sha256("01"),
-    sha256("02"),
-    sha256("08"),
-    sha256("04"),
-    sha256("05"),
-    sha256("06"),
-    sha256("07"),
-    sha256("08"),
-    sha256("09"),
-    sha256("10"),
-    sha256("11"),
-    sha256("12"),
-    sha256("13"),
-    sha256("14"),
-    sha256("15"),
-    sha256("16"),
-    sha256("17"),
-    sha256("18"),
-    sha256("19"),
-    sha256("20")
+    sha256d("01"),
+    sha256d("02"),
+    sha256d("08"),
+    sha256d("04"),
+    sha256d("05"),
+    sha256d("06"),
+    sha256d("07"),
+    sha256d("08"),
+    sha256d("09"),
+    sha256d("10"),
+    sha256d("11"),
+    sha256d("12"),
+    sha256d("13"),
+    sha256d("14"),
+    sha256d("15"),
+    sha256d("16"),
+    sha256d("17"),
+    sha256d("18"),
+    sha256d("19"),
+    sha256d("20")
   ]
 
   expect(getMerkleRoot(hashes2)).toBe(root2)
@@ -156,58 +179,58 @@ test("update leafs", () => {
 
 test("merkelize array", () => {
   const array = [
-    sha256("01"),
-    sha256("02"),
-    sha256("08"),
-    sha256("04"),
-    sha256("05"),
-    sha256("06"),
-    sha256("07"),
-    sha256("08"),
-    sha256("09"),
-    sha256("10"),
-    sha256("11"),
-    sha256("12"),
-    sha256("13"),
-    sha256("14"),
-    sha256("15"),
-    sha256("16"),
-    sha256("17"),
-    sha256("18"),
-    sha256("19"),
-    sha256("20")
+    sha256d("01"),
+    sha256d("02"),
+    sha256d("08"),
+    sha256d("04"),
+    sha256d("05"),
+    sha256d("06"),
+    sha256d("07"),
+    sha256d("08"),
+    sha256d("09"),
+    sha256d("10"),
+    sha256d("11"),
+    sha256d("12"),
+    sha256d("13"),
+    sha256d("14"),
+    sha256d("15"),
+    sha256d("16"),
+    sha256d("17"),
+    sha256d("18"),
+    sha256d("19"),
+    sha256d("20")
   ]
 
   const newArray = [
-    sha256("01"),
-    sha256("02"),
-    sha256("123"),
-    sha256("04"),
-    sha256("05"),
-    sha256("06"),
-    sha256("07"),
-    sha256("08"),
-    sha256("09"),
-    sha256("10"),
-    sha256("11"),
-    sha256("12"),
-    sha256("13"),
-    sha256("14"),
-    sha256("15"),
-    sha256("16"),
-    sha256("17"),
-    sha256("18"),
-    sha256("19"),
-    sha256("20")
+    sha256d("01"),
+    sha256d("02"),
+    sha256d("123"),
+    sha256d("04"),
+    sha256d("05"),
+    sha256d("06"),
+    sha256d("07"),
+    sha256d("08"),
+    sha256d("09"),
+    sha256d("10"),
+    sha256d("11"),
+    sha256d("12"),
+    sha256d("13"),
+    sha256d("14"),
+    sha256d("15"),
+    sha256d("16"),
+    sha256d("17"),
+    sha256d("18"),
+    sha256d("19"),
+    sha256d("20")
   ]
 
   const merklePath = getMerklePath(2, array)
   const newMerklePath = getMerklePath(2, newArray)
 
-  const oldMerkleRoot = getMerkleRootByPath(sha256("03"), merklePath)
-  const newMerkleRoot = getMerkleRootByPath(sha256("123"), newMerklePath)
+  const oldMerkleRoot = getMerkleRootByPath(sha256d("03"), merklePath)
+  const newMerkleRoot = getMerkleRootByPath(sha256d("123"), newMerklePath)
 
-  const newMerkleRoot2 = updateLeaf(sha256("03"), sha256("123"), merklePath, oldMerkleRoot)
+  const newMerkleRoot2 = updateLeaf("03", "123", merklePath, oldMerkleRoot)
 
   expect(newMerkleRoot).toBe(newMerkleRoot2)
 })
@@ -486,21 +509,24 @@ test("test", () => {
 
   const version = marketContracts["49a07371b72a9261b25bd8c16c54d246"]
 
-  console.log(version)
+  // console.log(version)
 
   const merklePath = getMerklePathEntries(prevEntries, entryIndex, version)
   const newMerklePath = getMerklePathEntries(newEntries, entryIndex, version)
 
-  const oldLeaf = sha256(getEntryHex(prevEntries[entryIndex], version))
-  const newLeaf = sha256(getEntryHex(newEntry, version))
+  const oldEntryHex = getEntryHex(prevEntries[entryIndex], version)
+  const newEntryHex = getEntryHex(newEntry, version)
 
-  console.log(getEntryHex(prevEntries[entryIndex], version))
-  console.log(getEntryHex(newEntry, version))
+  // console.log(getEntryHex(prevEntries[entryIndex], version))
+  // console.log(getEntryHex(newEntry, version))
 
-  const oldMerkleRoot = getMerkleRootByPath(sha256(getEntryHex(prevEntries[entryIndex], version)), merklePath)
-  const newMerkleRoot = getMerkleRootByPath(sha256(getEntryHex(newEntry, version)), newMerklePath)
+  const oldMerkleRoot = getMerkleRootByPath(sha256d(getEntryHex(prevEntries[entryIndex], version)), merklePath)
+  const newMerkleRoot = getMerkleRootByPath(sha256d(getEntryHex(newEntry, version)), newMerklePath)
 
-  const oldMerkleRoot2 = getMerkleRoot([sha256("00"), ...prevEntries.map(entry => sha256(getEntryHex(entry, version)))])
+  const oldMerkleRoot2 = getMerkleRoot([
+    sha256d("00"),
+    ...prevEntries.map(entry => sha256d(getEntryHex(entry, version)))
+  ])
 
   // console.log(oldLeaf, "7aceb8f2096fc689ac2dae6cf99a2ff59f6956bc19546af68e335a0c82735d48")
   // console.log(newLeaf, "664631d4ab4411a0758f6378a6c8a7060ee9e99211a85fb9dee78fe645d3dc78")
@@ -508,8 +534,8 @@ test("test", () => {
   //   merklePath,
   //   "bf2ecefebf001a0557579a450f82e6078aac201820340b1a2c10c82aa857cc5601c49bf3219e5d1ba114f265f0c93bc02d5a1b422715b3c5052b6cad12a12c71c301c3c0786069b96a9e95c86f0d583726c5d8e54abab3e8f88b5540493df526b74c00e6aee30ff6889de62eab122163122305787cc58534a7d0225a02b8d43fce7a5f003a98eb9d3b9a8535c780d70516f0a1a72380bd7f8b8243357eec07ac98de2abe01"
   // )
-  console.log(oldMerkleRoot, "fa92ce804e850e38e1d8ec941d19fca50f5aa1def9cdaef55f79ade5fa10a905")
-  console.log(oldMerkleRoot2)
+  // console.log(oldMerkleRoot, "fa92ce804e850e38e1d8ec941d19fca50f5aa1def9cdaef55f79ade5fa10a905")
+  // console.log(oldMerkleRoot2)
 
   // expect(oldLeaf).toBe("7aceb8f2096fc689ac2dae6cf99a2ff59f6956bc19546af68e335a0c82735d48")
   // expect(newLeaf).toBe("664631d4ab4411a0758f6378a6c8a7060ee9e99211a85fb9dee78fe645d3dc78")
@@ -525,7 +551,7 @@ test("test", () => {
   //   "ff2490b876963fd1d4eed1e0e08c038811c6e53dfde6894c43af4b08ad36ba7a"
   // )
 
-  updateLeaf(oldLeaf, newLeaf, merklePath, oldMerkleRoot)
+  updateLeaf(oldEntryHex, newEntryHex, merklePath, oldMerkleRoot)
 })
 
 test("entries", () => {
@@ -820,9 +846,9 @@ test("entries", () => {
 
   const version = marketContracts["49a07371b72a9261b25bd8c16c54d246"]
 
-  const oldMerkleRoot = getMerkleRoot([sha256("00"), ...oldEntries.map(entry => sha256(getEntryHex(entry, version)))])
-  const newMerkleRoot = getMerkleRoot([sha256("00"), ...newEntries.map(entry => sha256(getEntryHex(entry, version)))])
+  const oldMerkleRoot = getMerkleRoot([sha256d("00"), ...oldEntries.map(entry => sha256d(getEntryHex(entry, version)))])
+  const newMerkleRoot = getMerkleRoot([sha256d("00"), ...newEntries.map(entry => sha256d(getEntryHex(entry, version)))])
 
-  console.log(oldMerkleRoot, "c1fe054e64a1f9b52d6a939b27f8d5346b3ec37530a03628fcd5badb8647a1bc")
-  console.log(newMerkleRoot, "fa92ce804e850e38e1d8ec941d19fca50f5aa1def9cdaef55f79ade5fa10a905")
+  // console.log(oldMerkleRoot, "c1fe054e64a1f9b52d6a939b27f8d5346b3ec37530a03628fcd5badb8647a1bc")
+  // console.log(newMerkleRoot, "fa92ce804e850e38e1d8ec941d19fca50f5aa1def9cdaef55f79ade5fa10a905")
 })

@@ -39,8 +39,8 @@ import { balance, SatScaling } from "../src/lmsr"
 import bsv from "bsv"
 import { getSignature, oracleDetail } from "../src/oracle"
 import { cloneDeep } from "lodash"
-import { addLeaf } from "../src/merkleTree"
-import { marketVersion, oracleContracts, currentOracleContract } from "../src/contracts"
+import { addLeaf, getMerkleRoot } from "../src/merkleTree"
+import { marketVersion, oracleContracts, currentOracleContract, marketContracts } from "../src/contracts"
 import { toHex } from "../src/hex"
 import { sha256 } from "../src/sha"
 
@@ -248,7 +248,14 @@ test("add entry", () => {
 test("add entry in old market version", () => {
   // jest.mock('../src/service', () => require('./__mocks__/request'));
 
-  const tx = getMarketCreationTx({ ...market, version: "b7be4afbfb07f03ee23b01289804c1c9" }, valaIndexTx)
+  // const version = marketContracts["b7be4afbfb07f03ee23b01289804c1c9"]
+  const oldMarket: marketInfo = {
+    ...market,
+    version: "b7be4afbfb07f03ee23b01289804c1c9",
+    balanceMerkleRoot: getMerkleRoot([sha256("00")])
+  }
+
+  const tx = getMarketCreationTx(oldMarket, valaIndexTx)
 
   expect(isValidMarketInitOutput(tx, 1)).toBe(true)
 
